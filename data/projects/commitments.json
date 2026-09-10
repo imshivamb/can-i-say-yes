@@ -1,0 +1,89 @@
+[
+  {
+    "id": "cmt_bloom_festive",
+    "request_id": "req_bloom_festive",
+    "assessment_id": "asm_bloom_festive",
+    "customer_id": "cli_bloom",
+    "customer_name": "Bloom Hotels",
+    "title": "Festive stay campaign",
+    "scope_summary": "Festive key visuals and stay campaign package",
+    "work_items": [
+      {
+        "id": "wi_bloom_design",
+        "kind": "social_creative",
+        "name": "Festive key visuals",
+        "quantity": 8,
+        "estimated_hours": 54,
+        "skill": "design"
+      }
+    ],
+    "original_deadline": "2026-09-17",
+    "committed_deadline": "2026-09-17",
+    "current_forecast": "2026-09-17",
+    "budget": { "currency": "INR", "amount": 380000 },
+    "extra_cost": { "currency": "INR", "amount": 0 },
+    "status": "MONITORING",
+    "health": "ON_TRACK",
+    "monitor_event_types": ["supplier_update", "calendar_change", "capacity_change"],
+    "created_at": "2026-08-20T10:00:00+05:30",
+    "updated_at": "2026-09-12T09:00:00+05:30"
+  },
+  {
+    "id": "cmt_nova_launch",
+    "request_id": "req_nova_launch",
+    "assessment_id": "asm_nova_launch",
+    "customer_id": "cli_nova",
+    "customer_name": "Nova Health",
+    "title": "Product launch site",
+    "scope_summary": "Launch marketing site",
+    "work_items": [
+      {
+        "id": "wi_nova_site",
+        "kind": "landing_page",
+        "name": "Launch site",
+        "quantity": 1,
+        "estimated_hours": 60,
+        "skill": "development"
+      }
+    ],
+    "original_deadline": "2026-09-25",
+    "committed_deadline": "2026-09-25",
+    "current_forecast": "2026-09-25",
+    "budget": { "currency": "INR", "amount": 520000 },
+    "extra_cost": { "currency": "INR", "amount": 0 },
+    "status": "MONITORING",
+    "health": "ON_TRACK",
+    "monitor_event_types": ["calendar_change", "capacity_change"],
+    "created_at": "2026-08-28T11:00:00+05:30",
+    "updated_at": "2026-09-12T09:00:00+05:30"
+  },
+  {
+    "id": "cmt_kinetic_site",
+    "request_id": "req_kinetic_site",
+    "assessment_id": "asm_kinetic_site",
+    "customer_id": "cli_kinetic",
+    "customer_name": "Kinetic Bikes",
+    "title": "Brand site phase 2",
+    "scope_summary": "Phase 2 pages and components",
+    "work_items": [
+      {
+        "id": "wi_kinetic_site",
+        "kind": "landing_page",
+        "name": "Phase 2 pages",
+        "quantity": 6,
+        "estimated_hours": 56,
+        "skill": "development"
+      }
+    ],
+    "original_deadline": "2026-10-03",
+    "committed_deadline": "2026-10-03",
+    "current_forecast": "2026-10-03",
+    "budget": { "currency": "INR", "amount": 610000 },
+    "extra_cost": { "currency": "INR", "amount": 0 },
+    "status": "MONITORING",
+    "health": "ON_TRACK",
+    "monitor_event_types": ["calendar_change", "capacity_change"],
+    "created_at": "2026-08-15T09:30:00+05:30",
+    "updated_at": "2026-09-12T09:00:00+05:30"
+  }
+]

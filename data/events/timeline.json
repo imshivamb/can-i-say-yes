@@ -1,0 +1,16 @@
+[
+  {
+    "id": "evt_supplier_delay",
+    "type": "supplier_update",
+    "occurs_at": "2026-09-19T09:15:00+05:30",
+    "source_reference": "eml_editor_delay",
+    "summary": "Frame & Grain cannot start until 20 September",
+    "payload": {
+      "supplier_id": "sup_frame_grain",
+      "available_from": "2026-09-20",
+      "previous_available_from": "2026-09-15"
+    },
+    "consumed": false,
+    "related_commitment_ids": []
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "doc_bloom_plan",
+    "title": "Bloom festive project plan",
+    "kind": "plan",
+    "created_at": "2026-08-21T10:00:00+05:30",
+    "body": "Milestone: festive stay campaign delivery 17 September 2026. Priority: critical. Design lead Priya Nair. Do not slip this date.",
+    "related_client_id": "cli_bloom"
+  },
+  {
+    "id": "doc_capacity_0912",
+    "title": "Capacity sheet 12 September",
+    "kind": "plan",
+    "created_at": "2026-09-12T08:30:00+05:30",
+    "body": "Design weekly hours 120. Booked 98.4. Utilization 82%. Video internal 40/40. Development 72/80.",
+    "related_client_id": null
+  },
+  {
+    "id": "doc_video_sop",
+    "title": "Video production SOP",
+    "kind": "sop",
+    "created_at": "2026-03-02T09:00:00+05:30",
+    "body": "Final cut requires approved product photography. Do not schedule finishing until assets are in-house and signed off.",
+    "related_client_id": null
+  },
+  {
+    "id": "doc_rate_card",
+    "title": "Northstar rate card",
+    "kind": "pricing",
+    "created_at": "2026-04-01T09:00:00+05:30",
+    "body": "Campaign package starting ₹3.8 lakh. Freelance video backup typically ₹18,000 per engagement.",
+    "related_client_id": null
+  },
+  {
+    "id": "doc_acme_sow",
+    "title": "Acme retainer SOW",
+    "kind": "contract",
+    "created_at": "2026-01-15T11:00:00+05:30",
+    "body": "Monthly retainer covers account coordination and light organic posts. It does not include a September campaign package, landing page, or video series.",
+    "related_client_id": "cli_acme"
+  },
+  {
+    "id": "doc_frame_terms",
+    "title": "Frame & Grain supplier terms",
+    "kind": "supplier",
+    "created_at": "2026-07-09T12:00:00+05:30",
+    "body": "Editing starts only on confirmed dates. Cancellations inside 48 hours may still be billed.",
+    "related_client_id": null
+  }
+]

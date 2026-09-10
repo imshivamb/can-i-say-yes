@@ -1,0 +1,23 @@
+{
+  "name": "can-i-say-yes",
+  "architecture": "ARM64",
+  "containerPort": 8080,
+  "healthCheck": {
+    "path": "/ping",
+    "intervalSeconds": 30,
+    "timeoutSeconds": 5
+  },
+  "observability": {
+    "traces": true,
+    "logs": true,
+    "toolEvents": true
+  },
+  "environment": [
+    "AWS_REGION",
+    "CISAY_BEDROCK_MODEL",
+    "GMAIL_ACCESS_TOKEN",
+    "GOOGLE_ACCESS_TOKEN",
+    "GOOGLE_CALENDAR_ID",
+    "SES_FROM_ADDRESS"
+  ]
+}

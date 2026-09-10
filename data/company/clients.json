@@ -1,0 +1,6 @@
+[
+  { "id": "cli_acme", "name": "Acme Foods", "priority": "normal" },
+  { "id": "cli_bloom", "name": "Bloom Hotels", "priority": "critical" },
+  { "id": "cli_nova", "name": "Nova Health", "priority": "high" },
+  { "id": "cli_kinetic", "name": "Kinetic Bikes", "priority": "normal" }
+]

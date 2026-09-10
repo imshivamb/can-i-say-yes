@@ -1,0 +1,57 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+evals/results/*.json
+apps/web/node_modules/
+apps/web/.next/
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+out/
+apps/web/.next/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local / generated
+evals/results/*.json
+!evals/results/.gitkeep
+data/runtime/*
+!data/runtime/.gitkeep
+docs/
+data/runtime/*
+!data/runtime/.gitkeep
+.aws-sam/
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Agent / eval artifacts
+.strands/
+*.log

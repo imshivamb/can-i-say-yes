@@ -1,0 +1,26 @@
+[
+  {
+    "id": "cal_priya_ooo",
+    "person_id": "per_priya",
+    "title": "Creative lead unavailable",
+    "start": "2026-09-12T00:00:00+05:30",
+    "end": "2026-09-13T23:59:59+05:30",
+    "kind": "ooo"
+  },
+  {
+    "id": "cal_bloom_review",
+    "person_id": "per_priya",
+    "title": "Bloom festive review",
+    "start": "2026-09-16T15:00:00+05:30",
+    "end": "2026-09-16T16:30:00+05:30",
+    "kind": "meeting"
+  },
+  {
+    "id": "cal_ananya_offsite",
+    "person_id": "per_ananya",
+    "title": "Founder offsite (half day)",
+    "start": "2026-09-18T09:00:00+05:30",
+    "end": "2026-09-18T13:00:00+05:30",
+    "kind": "ooo"
+  }
+]

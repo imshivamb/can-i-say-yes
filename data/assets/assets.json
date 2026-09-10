@@ -1,0 +1,11 @@
+[
+  {
+    "id": "ast_acme_product_photos",
+    "client_id": "cli_acme",
+    "name": "Product photography",
+    "required": true,
+    "received": false,
+    "promised_on": "2026-09-10",
+    "received_on": null
+  }
+]

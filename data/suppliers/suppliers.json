@@ -1,0 +1,47 @@
+[
+  {
+    "id": "sup_frame_grain",
+    "name": "Frame & Grain",
+    "kind": "video_editor",
+    "available_from": "2026-09-15",
+    "available_until": null,
+    "daily_rate": { "currency": "INR", "amount": 18000 },
+    "notes": "Freelance editor. Can start Northstar work from 15 September."
+  },
+  {
+    "id": "sup_cutoff",
+    "name": "Cutoff Edit",
+    "kind": "video_editor",
+    "available_from": "2026-09-20",
+    "available_until": null,
+    "daily_rate": { "currency": "INR", "amount": 18000 },
+    "notes": "Backup editor. Used only if Frame & Grain slips."
+  },
+  {
+    "id": "sup_lenskit",
+    "name": "Lenskit Studio",
+    "kind": "photographer",
+    "available_from": "2026-09-15",
+    "available_until": null,
+    "daily_rate": { "currency": "INR", "amount": 12000 },
+    "notes": "Booked through 14 September."
+  },
+  {
+    "id": "sup_wordmill",
+    "name": "Wordmill",
+    "kind": "copy_contractor",
+    "available_from": null,
+    "available_until": null,
+    "daily_rate": { "currency": "INR", "amount": 6000 },
+    "notes": "Available."
+  },
+  {
+    "id": "sup_pixelhost",
+    "name": "Pixelhost",
+    "kind": "hosting",
+    "available_from": null,
+    "available_until": null,
+    "daily_rate": null,
+    "notes": "Retainer hosting vendor."
+  }
+]

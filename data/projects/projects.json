@@ -1,0 +1,104 @@
+[
+  {
+    "id": "prj_bloom_festive",
+    "client_id": "cli_bloom",
+    "name": "Festive stay campaign",
+    "status": "active",
+    "deadline": "2026-09-17",
+    "priority": "critical",
+    "assigned_person_ids": ["per_priya", "per_arjun", "per_sara", "per_isha", "per_dev"],
+    "work_items": [
+      {
+        "id": "wi_bloom_design",
+        "kind": "social_creative",
+        "name": "Festive key visuals",
+        "quantity": 8,
+        "estimated_hours": 54,
+        "skill": "design"
+      }
+    ],
+    "booked_hours_by_person": {
+      "per_priya": 28,
+      "per_arjun": 26,
+      "per_sara": 8,
+      "per_isha": 6,
+      "per_dev": 40
+    },
+    "dependencies": [],
+    "budget": { "currency": "INR", "amount": 380000 }
+  },
+  {
+    "id": "prj_nova_launch",
+    "client_id": "cli_nova",
+    "name": "Product launch site",
+    "status": "active",
+    "deadline": "2026-09-25",
+    "priority": "high",
+    "assigned_person_ids": ["per_maya", "per_vikram"],
+    "work_items": [
+      {
+        "id": "wi_nova_site",
+        "kind": "landing_page",
+        "name": "Launch site",
+        "quantity": 1,
+        "estimated_hours": 60,
+        "skill": "development"
+      }
+    ],
+    "booked_hours_by_person": {
+      "per_maya": 28,
+      "per_vikram": 32
+    },
+    "dependencies": [],
+    "budget": { "currency": "INR", "amount": 520000 }
+  },
+  {
+    "id": "prj_kinetic_site",
+    "client_id": "cli_kinetic",
+    "name": "Brand site phase 2",
+    "status": "active",
+    "deadline": "2026-10-03",
+    "priority": "normal",
+    "assigned_person_ids": ["per_leen", "per_maya"],
+    "work_items": [
+      {
+        "id": "wi_kinetic_site",
+        "kind": "landing_page",
+        "name": "Phase 2 pages",
+        "quantity": 6,
+        "estimated_hours": 56,
+        "skill": "development"
+      }
+    ],
+    "booked_hours_by_person": {
+      "per_leen": 40,
+      "per_maya": 16.4
+    },
+    "dependencies": [],
+    "budget": { "currency": "INR", "amount": 610000 }
+  },
+  {
+    "id": "prj_acme_retainer",
+    "client_id": "cli_acme",
+    "name": "Monthly retainer",
+    "status": "active",
+    "deadline": "2026-12-31",
+    "priority": "normal",
+    "assigned_person_ids": ["per_isha"],
+    "work_items": [
+      {
+        "id": "wi_acme_am",
+        "kind": "other",
+        "name": "Account time",
+        "quantity": 1,
+        "estimated_hours": 4,
+        "skill": "account"
+      }
+    ],
+    "booked_hours_by_person": {
+      "per_isha": 4
+    },
+    "dependencies": [],
+    "budget": { "currency": "INR", "amount": 80000 }
+  }
+]

@@ -1,0 +1,87 @@
+[
+  {
+    "id": "per_ananya",
+    "name": "Ananya Shah",
+    "role": "Founder",
+    "skills": ["account"],
+    "weekly_hours": 20,
+    "unavailable": []
+  },
+  {
+    "id": "per_rohan",
+    "name": "Rohan Mehta",
+    "role": "Project manager",
+    "skills": ["project"],
+    "weekly_hours": 40,
+    "unavailable": []
+  },
+  {
+    "id": "per_isha",
+    "name": "Isha Kapoor",
+    "role": "Account manager",
+    "skills": ["account"],
+    "weekly_hours": 40,
+    "unavailable": []
+  },
+  {
+    "id": "per_priya",
+    "name": "Priya Nair",
+    "role": "Creative lead",
+    "skills": ["design"],
+    "weekly_hours": 40,
+    "unavailable": [
+      {
+        "start": "2026-09-12T00:00:00+05:30",
+        "end": "2026-09-13T23:59:59+05:30"
+      }
+    ]
+  },
+  {
+    "id": "per_arjun",
+    "name": "Arjun Desai",
+    "role": "Designer",
+    "skills": ["design"],
+    "weekly_hours": 40,
+    "unavailable": []
+  },
+  {
+    "id": "per_maya",
+    "name": "Maya Fernandes",
+    "role": "Designer",
+    "skills": ["design"],
+    "weekly_hours": 40,
+    "unavailable": []
+  },
+  {
+    "id": "per_vikram",
+    "name": "Vikram Rao",
+    "role": "Developer",
+    "skills": ["development"],
+    "weekly_hours": 40,
+    "unavailable": []
+  },
+  {
+    "id": "per_leen",
+    "name": "Leen Chawla",
+    "role": "Developer",
+    "skills": ["development"],
+    "weekly_hours": 40,
+    "unavailable": []
+  },
+  {
+    "id": "per_dev",
+    "name": "Dev Malhotra",
+    "role": "Video editor",
+    "skills": ["video"],
+    "weekly_hours": 40,
+    "unavailable": []
+  },
+  {
+    "id": "per_sara",
+    "name": "Sara Iqbal",
+    "role": "Copywriter",
+    "skills": ["copy"],
+    "weekly_hours": 40,
+    "unavailable": []
+  }
+]
