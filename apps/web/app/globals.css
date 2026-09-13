@@ -118,3 +118,80 @@ h1 span { color: var(--mint); }
 .option-row.selected .option-meta .option-check { color: var(--mint); }
 .option-row.recommended:not(.selected) { margin: 0; width: 100%; padding: 15px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
 .option-row.selected { margin: 0 -12px; width: calc(100% + 24px); padding: 15px 12px; border: 1px solid #53634d; border-radius: 8px; background: #263525; }
+
+/* Calm operations product theme */
+:root {
+  --bg: #f4f6f3;
+  --panel: #ffffff;
+  --panel-raised: #fbfcfa;
+  --line: #e2e7e3;
+  --line-bright: #c9d2cc;
+  --text: #1d2824;
+  --muted: #728079;
+  --soft: #43524b;
+  --mint: #287a55;
+  --teal: #2c806f;
+  --purple: #6e5bb5;
+  --amber: #a56d18;
+  --red: #bd4c4c;
+}
+
+body { background: var(--bg); color: var(--text); }
+.app-shell { background: var(--bg); }
+.sidebar { background: #fbfcfa; border-color: var(--line); }
+.brand-mark { color: #fff; background: #287a55; }
+.brand-lockup strong, .nav-item:hover, .nav-item.active { color: var(--text); }
+.nav-item:hover, .nav-item.active { background: #edf2ee; }
+.nav-item b { color: var(--muted); }
+.nav-item.active { box-shadow: inset 2px 0 var(--mint); }
+.sidebar-bottom, .topbar, .date-control { background: #fff; border-color: var(--line); }
+.sidebar-bottom strong { color: var(--text); }
+.workspace { background: var(--bg); }
+.topbar { border-color: var(--line); }
+.crumbs strong { color: var(--text); }
+.avatar { color: #fff; background: #287a55; }
+h1 { font-size: clamp(30px, 3vw, 36px); letter-spacing: -.05em; }
+.intro, .metric-card em, .option-row p { color: var(--muted); }
+.metric-card, .metric-primary { background: #fff; border-color: var(--line); }
+.metric-primary { background: #edf6f0; }
+.metric-icon { color: var(--teal); background: #e8f3ef; }
+.calm-icon { color: var(--mint); background: #e8f3eb; }
+.warning-icon { color: var(--amber); background: #f8f0df; }
+.danger-icon { color: var(--red); background: #f9e9e9; }
+.mini-ring { border-color: var(--mint); border-left-color: #b5d0bf; color: var(--mint); }
+.card-surface { background: #fff; border-color: var(--line); box-shadow: 0 8px 24px #26382d0b; }
+.empty-command { min-height: 190px; }
+.empty-glow { display: none; }
+.empty-icon { width: 48px; height: 48px; color: var(--mint); border-color: #b9d8c4; border-radius: 12px; background: #edf6f0; font-size: 18px; }
+.purple-tag { color: var(--purple); background: #f0edfa; }
+.primary-button { color: #fff; background: #287a55; border-radius: 6px; }
+.primary-button:hover { background: #216746; }
+.decision-layout { grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr); }
+.decision-card, .options-card { padding: 24px; }
+.customer-mark { color: #fff; background: #b27724; }
+.status-danger { color: var(--red); background: #f9e9e9; }
+.status-calm { color: var(--mint); background: #e8f3eb; }
+.reason-1 { color: var(--red); background: #f9e9e9; }
+.reason-2 { color: var(--amber); background: #f8f0df; }
+.reason-3 { color: var(--purple); background: #f0edfa; }
+.reason-4 { color: var(--teal); background: #e8f3ef; }
+.option-row:hover { background: #f6f8f6 !important; }
+.option-row.selected { border-color: #78ad8d; background: #edf6f0; box-shadow: 0 0 0 1px #78ad8d55; }
+.option-row:not(:has(.option-letter)) { grid-template-columns: minmax(0, 1fr) auto; }
+.approval-note { border-color: #ddd7f1; background: #f5f2fc; }
+.approval-note p { color: #6e6686; }
+.approval-note b { color: #4d4667; }
+.ghost-button { border-color: var(--line-bright); color: var(--soft); background: #fff; }
+.ghost-button:hover { background: #f1f5f2; }
+.risk-card { background: #fff; border-color: var(--line); }
+.risk-art { display: none; }
+.risk-live { border-color: #e5b3b3; background: #fffafa; }
+.error-banner { background: #fff3f3; border-color: #e5b3b3; }
+.success-banner { background: #edf6f0; border-color: #b9d8c4; box-shadow: none; }
+.success-mark { color: #fff; background: #287a55; }
+.success-banner strong { color: var(--mint); }
+.active-dot { box-shadow: none; }
+
+@media (max-width: 1150px) {
+  .decision-layout { grid-template-columns: 1fr; }
+}
