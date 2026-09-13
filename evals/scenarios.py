@@ -38,3 +38,23 @@ def scenarios() -> list[Scenario]:
     )
     return cases
 
+
+def live_scenarios() -> list[Scenario]:
+    """Ten-case live Bedrock suite: B-03, five injections, then four more."""
+    by_id = {case.id: case for case in scenarios()}
+    return [
+        by_id[scenario_id]
+        for scenario_id in (
+            "B-03",
+            "G-01",
+            "G-02",
+            "G-03",
+            "G-04",
+            "G-05",
+            "B-01",
+            "B-02",
+            "B-04",
+            "B-05",
+        )
+    ]
+

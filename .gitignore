@@ -43,6 +43,7 @@ apps/web/.next/
 evals/results/*.json
 !evals/results/.gitkeep
 !evals/results/latest.json
+!evals/results/live-latest.json
 data/runtime/*
 !data/runtime/.gitkeep
 docs/

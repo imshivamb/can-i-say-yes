@@ -35,7 +35,8 @@
         "bedrock:InvokeModel",
         "bedrock:InvokeModelWithResponseStream",
         "bedrock:Converse",
-        "bedrock:ConverseStream"
+        "bedrock:ConverseStream",
+        "bedrock-mantle:*"
       ],
       "Resource": "*"
     }

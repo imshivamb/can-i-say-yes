@@ -84,7 +84,8 @@
         "xray:UpdateTraceSegmentDestination",
         "xray:GetTraceSegmentDestination",
         "xray:PutTraceSegments",
-        "xray:PutTelemetryRecords"
+        "xray:PutTelemetryRecords",
+        "application-signals:StartDiscovery"
       ],
       "Resource": "*"
     },

@@ -85,6 +85,10 @@ Deterministic verification layer (`python -m evals.run`, [evals/results/latest.j
 
 This measures the recorded engine and policy layer, not the live Bedrock agent. Do not read it as “the LLM ignored five injections.”
 
+Live Strands Investigator on Bedrock (`python -m evals.run --live`, writes [evals/results/live-latest.json](evals/results/live-latest.json)):
+
+- Not committed yet. Run the 10-case live suite once and report those numbers here. Do not pick the best of several runs.
+
 ## Run locally
 
 Python 3.12. From a fresh clone:
@@ -94,9 +98,10 @@ Python 3.12. From a fresh clone:
 3. `cp .env.example .env` and set Bedrock/AWS credentials if you want the live loop
 4. `pytest -q`
 5. `python -m evals.run`
-6. `python -m agent.cli --recorded`
-7. `CISAY_RECORDED=0 uvicorn agent.server:app --reload --port 8080`
-8. `cd apps/web && npm install && npm run dev` — UI at http://localhost:3000, API at http://localhost:8080
+6. `python -m evals.run --live` (needs Bedrock credentials; writes `evals/results/live-latest.json`)
+7. `python -m agent.cli --recorded`
+8. `CISAY_RECORDED=0 uvicorn agent.server:app --reload --port 8080`
+9. `cd apps/web && npm install && npm run dev` — UI at http://localhost:3000, API at http://localhost:8080
 
 ## Deploy
 
