@@ -5,7 +5,8 @@ from agent.server import app
 client = TestClient(app)
 
 
-def test_api_replays_full_recorded_commitment_loop() -> None:
+def test_api_replays_full_recorded_commitment_loop(monkeypatch) -> None:
+    monkeypatch.setenv("CISAY_RECORDED", "1")
     created = client.post(
         "/api/requests",
         json={"text": "Acme campaign request", "recorded": True},

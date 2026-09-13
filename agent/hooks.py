@@ -10,6 +10,10 @@ from domain.clock import ensure_tz
 from domain.ids import new_id
 from domain.models import ActivityItem, AuditRecord
 
+STRUCTURED_OUTPUT_TOOLS = frozenset(
+    {"ParsedRequest", "FeasibilityAssessment", "CustomerMessageDraft"}
+)
+
 
 class AuthorityAndTraceHooks(HookProvider):
     """Make tool activity visible and enforce policy before Strands executes writes."""
@@ -22,6 +26,8 @@ class AuthorityAndTraceHooks(HookProvider):
     def before_tool_call(self, event: BeforeToolCallEvent) -> None:
         session = current_session()
         name = event.tool_use.get("name", "unknown")
+        if name in STRUCTURED_OUTPUT_TOOLS:
+            return
         arguments = event.tool_use.get("input", {})
         if not isinstance(arguments, dict):
             arguments = {}
@@ -68,6 +74,8 @@ class AuthorityAndTraceHooks(HookProvider):
     def after_tool_call(self, event: AfterToolCallEvent) -> None:
         session = current_session()
         name = event.tool_use.get("name", "unknown")
+        if name in STRUCTURED_OUTPUT_TOOLS:
+            return
         session.activity.append(
             ActivityItem(
                 id=new_id("aud"),

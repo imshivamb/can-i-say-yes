@@ -48,7 +48,7 @@ class ApprovalInput(BaseModel):
 
 class AdvanceInput(BaseModel):
     to: str
-    recorded: bool = True
+    recorded: bool = False
 
 
 class InboundEventInput(BaseModel):
@@ -254,7 +254,11 @@ def inbound_event(payload: InboundEventInput) -> dict[str, Any]:
         return {"status": "duplicate", "event_id": event.id}
     session.world.events.append(event)
     session.persist()
-    opened = advance_clock(session, session.world.clock.now, recorded=True)
+    opened = advance_clock(
+        session,
+        session.world.clock.now,
+        recorded=_recorded_mode(),
+    )
     return {"status": "accepted", "event_id": event.id, "opened_decisions": len(opened)}
 
 
@@ -262,7 +266,11 @@ def inbound_event(payload: InboundEventInput) -> dict[str, Any]:
 def poll_gmail(query: str = "newer_than:7d") -> dict[str, Any]:
     session = _new_session()
     try:
-        event_ids = poll_and_reassess(session, query=query)
+        event_ids = poll_and_reassess(
+            session,
+            query=query,
+            recorded=_recorded_mode(),
+        )
     except (OSError, ValueError, KeyError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"status": "accepted", "event_ids": event_ids}

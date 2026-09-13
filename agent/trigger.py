@@ -45,6 +45,7 @@ def poll_and_reassess(
     *,
     query: str = "newer_than:7d",
     now: datetime | None = None,
+    recorded: bool = True,
 ) -> list[str]:
     """Poll Gmail, ingest new messages, and wake the Monitor once per batch."""
     messages = GmailAdapter().poll(query)
@@ -58,6 +59,6 @@ def poll_and_reassess(
             (event.occurs_at for event in session.world.events if event.id in event_ids),
             default=session.world.clock.now,
         )
-        advance_clock(session, target, recorded=True)
+        advance_clock(session, target, recorded=recorded)
     return event_ids
 

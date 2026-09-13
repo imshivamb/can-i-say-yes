@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Any, Literal, Never
 
 from strands import Agent
-from strands.models import BedrockModel
+from strands.models.openai import OpenAIModel
 from strands.types.exceptions import StructuredOutputException
 
 from agent.config import aws_region, load_prompt, model_id
@@ -32,11 +32,20 @@ def _assert_never(value: Never) -> Never:
     raise ValueError(f"unhandled invoke kind: {value}")
 
 
+def _build_model() -> OpenAIModel:
+    """Build an OpenAI-compatible model routed through Amazon Bedrock Mantle."""
+    return OpenAIModel(
+        model_id=model_id(),
+        bedrock_mantle_config={"region": aws_region()},
+        params={"temperature": 0.0},
+    )
+
+
 def _system_prompt(kind: InvokeKind) -> str:
     text = load_prompt("system.md")
     match kind:
         case "parse_request":
-            return text
+            return load_prompt("parse.md")
         case "assess_feasibility":
             return text + "\n\n" + load_prompt("feasibility.md")
         case "reassess_commitment":
@@ -60,7 +69,7 @@ def build_investigator(
 ) -> Agent:
     if kind not in {"parse_request", "assess_feasibility", "draft_customer_message"}:
         raise ValueError(f"investigator cannot handle {kind}")
-    model = BedrockModel(model_id=model_id(), region_name=aws_region(), temperature=0.2)
+    model = _build_model()
     tools = [] if kind in {"parse_request", "draft_customer_message"} else list(P0_TOOLS)
     return Agent(
         name="investigator",
@@ -71,7 +80,7 @@ def build_investigator(
         system_prompt=_system_prompt(kind),
         tools=tools,
         callback_handler=callback_handler,
-        hooks=[AuthorityAndTraceHooks()],
+        hooks=[] if kind == "parse_request" else [AuthorityAndTraceHooks()],
     )
 
 
@@ -79,7 +88,7 @@ def build_monitor(
     *,
     callback_handler: Callable[..., Any] | None = None,
 ) -> Agent:
-    model = BedrockModel(model_id=model_id(), region_name=aws_region(), temperature=0.2)
+    model = _build_model()
     investigator = build_investigator("assess_feasibility", callback_handler=callback_handler)
     return Agent(
         name="monitor",
@@ -112,6 +121,8 @@ def _parse_prompt(raw_text: str) -> str:
     return (
         "Extract a structured customer commitment request from the text.\n"
         "Use ISO dates. Store budget as integer INR rupees (₹4.2 lakh is 420000).\n"
+        f"Simulation date: {DEMO_START.date().isoformat()}. "
+        "When a date omits its year, use the simulation year.\n"
         "Give the request an id starting with req_. Work item ids start with wi_.\n"
         "If the customer is a known Northstar client, set customer_id "
         "(Acme Foods is cli_acme).\n\n"
@@ -137,7 +148,14 @@ def _structured[T](agent: Agent, prompt: str, model: type[T], attempts: int = 3)
     last_error: Exception | None = None
     for _ in range(attempts):
         try:
-            result = agent(prompt, structured_output_model=model)
+            result = agent(
+                prompt,
+                structured_output_model=model,
+                structured_output_prompt=(
+                    "Return exactly one valid instance of the requested schema. "
+                    "Do not add explanatory prose."
+                ),
+            )
             output = result.structured_output
             if output is None:
                 raise StructuredOutputException("structured_output was empty")

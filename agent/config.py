@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Strands' current Bedrock default. Override with CISAY_BEDROCK_MODEL.
-DEFAULT_MODEL_ID = "global.anthropic.claude-sonnet-4-6"
+# Bedrock Mantle Chat Completions model. Override with CISAY_BEDROCK_MODEL.
+DEFAULT_MODEL_ID = "zai.glm-4.7-flash"
 DEFAULT_REGION = "us-east-1"
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from agent.agent import invoke
 from agent.human import open_decision
 from agent.offline import run_recorded_reassessment
 from agent.session import AgentSession
@@ -26,7 +27,6 @@ def advance_clock(
     recorded: bool = True,
 ) -> list[HumanDecision]:
     """Set the simulation clock, consume due events, and reassess matched monitors."""
-    del recorded
     set_clock(session.world, resolve_clock_target(target))
     opened: list[HumanDecision] = []
     for event in due_events(session.world):
@@ -43,7 +43,14 @@ def advance_clock(
             mark_consumed(session.world, event.id)
             continue
         for commitment in affected:
-            assessment = run_recorded_reassessment(session, commitment.id, event.id)
+            if recorded:
+                assessment = run_recorded_reassessment(session, commitment.id, event.id)
+            else:
+                assessment = invoke(
+                    session,
+                    "reassess_commitment",
+                    commitment_id=commitment.id,
+                )
             updated = next(item for item in session.world.commitments if item.id == commitment.id)
             session.activity.append(
                 ActivityItem(

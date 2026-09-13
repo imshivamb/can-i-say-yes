@@ -1,11 +1,12 @@
 from datetime import date
 from pathlib import Path
 
+import agent.clock as clock_module
 from adapters.files.store import read_runtime, read_seed_commitment_ids
 from adapters.files.world import DATA_ROOT, load_world
 from agent.clock import advance_clock
 from agent.human import approve_decision, fulfill_approved_option, open_decision
-from agent.offline import run_recorded_investigation
+from agent.offline import run_recorded_investigation, run_recorded_reassessment
 from agent.session import AgentSession
 
 
@@ -68,3 +69,27 @@ def test_plus_three_days_stays_quiet(tmp_path: Path) -> None:
     assert acme.health == "ON_TRACK"
     event = next(item for item in session.world.events if item.id == "evt_supplier_delay")
     assert event.consumed is False
+
+
+def test_live_monitor_path_is_selected_when_recording_is_off(
+    tmp_path: Path, monkeypatch
+) -> None:
+    session = _session(tmp_path)
+    _approve_option_a(session)
+    calls: list[tuple[str, str]] = []
+
+    def fake_invoke(
+        current_session: AgentSession,
+        kind: str,
+        *,
+        commitment_id: str | None = None,
+        **_: object,
+    ):
+        calls.append((kind, commitment_id or ""))
+        return run_recorded_reassessment(current_session, commitment_id or "", "evt_supplier_delay")
+
+    monkeypatch.setattr(clock_module, "invoke", fake_invoke)
+    advance_clock(session, "supplier_delay", recorded=False)
+
+    acme = next(item for item in session.world.commitments if item.request_id == "req_acme_001")
+    assert calls == [("reassess_commitment", acme.id)]
