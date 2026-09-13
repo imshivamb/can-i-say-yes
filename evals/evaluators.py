@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from adapters.files.world import load_world
 from agent.agent import assess_request
 from agent.offline import run_recorded_investigation
-from agent.session import AgentSession
+from agent.session import AgentSession, use_session
 from domain.fixtures import acme_campaign_request
 from domain.models import FeasibilityAssessment, ParsedRequest
 from evals.scenarios import Scenario
@@ -35,7 +35,8 @@ def _investigate(
     session: AgentSession, request: ParsedRequest, *, live: bool
 ) -> FeasibilityAssessment:
     if live:
-        return assess_request(session, request)
+        with use_session(session):
+            return assess_request(session, request)
     return run_recorded_investigation(session, request)
 
 

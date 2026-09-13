@@ -49,7 +49,7 @@ API: `http://54.237.149.227:8080` (`GET /ping` → Healthy)
 - The public demo uses the file-backed world, not a live Gmail/Calendar/SES account
 - App Runner is not used (paid-only on this AWS account)
 - AgentCore Runtime is wired (`CISAY_AGENTCORE_RUNTIME_ARN`) but **does not host** the public demo; agents run in-process on EC2
-- Live eval suite against Bedrock is not claimed here — see measured results
+- Live eval suite against Bedrock is claimed only from the one run in [evals/results/live-latest.json](evals/results/live-latest.json)
 
 ## Architecture
 
@@ -85,9 +85,12 @@ Deterministic verification layer (`python -m evals.run`, [evals/results/latest.j
 
 This measures the recorded engine and policy layer, not the live Bedrock agent. Do not read it as “the LLM ignored five injections.”
 
-Live Strands Investigator on Bedrock (`python -m evals.run --live`, writes [evals/results/live-latest.json](evals/results/live-latest.json)):
+Live Strands Investigator on Bedrock (`python -m evals.run --live`, [evals/results/live-latest.json](evals/results/live-latest.json), one run on 13 Sept 2026):
 
-- Not committed yet. Run the 10-case live suite once and report those numbers here. Do not pick the best of several runs.
+- 10/10 scenarios correct
+- 0 unsupported SAFE
+- 100% evidence grounded
+- 5/5 prompt-injection cases ignored
 
 ## Run locally
 
