@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from adapters.files.runtime import reset_runtime
 from adapters.files.store import read_seed_commitment_ids
 from adapters.files.world import DATA_ROOT, load_world
+from adapters.integrations import live_integrations_enabled
 from agent.agent import invoke
 from agent.clock import advance_clock
 from agent.config import cors_origins
@@ -280,6 +281,57 @@ def activity() -> list[dict[str, Any]]:
     return [item.model_dump(mode="json") for item in _new_session().activity]
 
 
+@app.get("/api/world/sources")
+def world_sources() -> list[dict[str, Any]]:
+    session = _new_session()
+    calendar_live = live_integrations_enabled() and bool(os.getenv("GOOGLE_ACCESS_TOKEN"))
+    inbox_live = live_integrations_enabled() and bool(os.getenv("GMAIL_ACCESS_TOKEN"))
+    return [
+        {
+            "key": "people",
+            "label": "People & capacity",
+            "mode": "seed",
+            "detail": "data/company/people.json",
+            "count": len(session.world.people),
+        },
+        {
+            "key": "clients",
+            "label": "Clients",
+            "mode": "seed",
+            "detail": "data/company/clients.json",
+            "count": len(session.world.clients),
+        },
+        {
+            "key": "commitments",
+            "label": "Commitments",
+            "mode": "seed",
+            "detail": "data/projects/commitments.json",
+            "count": len(session.world.commitments),
+        },
+        {
+            "key": "suppliers",
+            "label": "Suppliers",
+            "mode": "seed",
+            "detail": "data/suppliers/suppliers.json",
+            "count": len(session.world.suppliers),
+        },
+        {
+            "key": "calendar",
+            "label": "Calendar",
+            "mode": "live" if calendar_live else "seed",
+            "detail": "Google Calendar · primary" if calendar_live else "data/company/calendar.json",
+            "count": None if calendar_live else len(session.world.calendar),
+        },
+        {
+            "key": "inbox",
+            "label": "Inbox",
+            "mode": "live" if inbox_live else "seed",
+            "detail": "Gmail · polled on demand" if inbox_live else "data/emails/emails.json",
+            "count": None if inbox_live else len(session.world.emails),
+        },
+    ]
+
+
 @app.get("/api/inbox")
 def inbox() -> list[dict[str, Any]]:
     session = _new_session()
@@ -349,7 +401,17 @@ def poll_gmail(query: str = "newer_than:7d") -> dict[str, Any]:
         )
     except (OSError, ValueError, KeyError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return {"status": "accepted", "event_ids": event_ids}
+    new_requests = sum(
+        1
+        for event in session.world.events
+        if event.id in event_ids and event.type == "message_received"
+    )
+    return {
+        "status": "accepted",
+        "event_ids": event_ids,
+        "new_events": len(event_ids),
+        "new_requests": new_requests,
+    }
 
 
 @app.post("/api/demo/reset")

@@ -102,6 +102,20 @@ def test_api_allows_browser_preflight_from_local_ui() -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
+def test_world_sources_lists_six_seed_rows() -> None:
+    body = client.get("/api/world/sources").json()
+    assert [item["key"] for item in body] == [
+        "people",
+        "clients",
+        "commitments",
+        "suppliers",
+        "calendar",
+        "inbox",
+    ]
+    assert all(item["mode"] == "seed" for item in body)
+    assert body[0]["count"] >= 1
+
+
 def test_api_allows_browser_preflight_from_vercel() -> None:
     response = client.options(
         "/api/activity",

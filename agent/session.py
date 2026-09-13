@@ -4,7 +4,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from adapters.files.store import RuntimeState, read_runtime, write_runtime
+from adapters.files.store import RuntimeState, read_runtime, write_activity, write_runtime
 from domain.ids import new_id
 from domain.models import (
     ActivityItem,
@@ -74,6 +74,11 @@ class AgentSession:
         for request in state.requests:
             self.requests[request.id] = request
 
+    def persist_activity(self) -> None:
+        if self.data_root is None:
+            return
+        write_activity(self.data_root, self.activity)
+
     def persist(self) -> None:
         if self.data_root is None:
             return
@@ -127,6 +132,7 @@ class AgentSession:
                 commitment_id=handoff.commitment_id,
             )
         )
+        self.persist_activity()
         return handoff
 
 

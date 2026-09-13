@@ -8,7 +8,8 @@ from agent.config import cors_origins
 from agent.runtime import apply_session_snapshot, session_snapshot, should_invoke_agentcore
 from agent.session import AgentSession
 from domain.fixtures import acme_campaign_request
-from domain.models import SimulationClock
+from domain.ids import new_id
+from domain.models import ActivityItem, SimulationClock
 
 
 def _session(tmp_path: Path) -> AgentSession:
@@ -87,3 +88,20 @@ def test_apply_session_snapshot_replaces_clock(tmp_path: Path) -> None:
         {"clock": SimulationClock(now=session.world.clock.now).model_dump(mode="json")},
     )
     assert session.world.clock.timezone == "Asia/Kolkata"
+
+
+def test_persist_activity_writes_only_the_activity_file(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    session.activity.append(
+        ActivityItem(
+            id=new_id("aud"),
+            timestamp=session.world.clock.now,
+            text="get_capacity started",
+        )
+    )
+    session.persist_activity()
+
+    remote = _session(tmp_path)
+    remote.load_runtime()
+    assert remote.activity[-1].text == "get_capacity started"
+    assert not (tmp_path / "runtime" / "commitments.json").exists()

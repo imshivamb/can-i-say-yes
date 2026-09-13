@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ActivityStream } from "@/components/activity-stream";
+import { VerdictBanner } from "@/components/verdict-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
+  type ActivityRecord,
   type Assessment,
   type Clock,
   type Commitment,
@@ -21,9 +21,10 @@ import {
   requestJob,
 } from "@/lib/api";
 
-type ExampleKey = "acme" | "nova";
+type PresetKey = "acme" | "nova";
+type ExampleKey = PresetKey | "custom";
 const EXAMPLES: Record<
-  ExampleKey,
+  PresetKey,
   { customer: string; request: string; date: string; budget: string; scope: string }
 > = {
   acme: {
@@ -58,11 +59,21 @@ export default function AutopilotPage() {
   const [riskApproved, setRiskApproved] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [example, setExample] = useState<ExampleKey>("acme");
+  const [draft, setDraft] = useState(EXAMPLES.acme.request);
+  const [parsedCustomer, setParsedCustomer] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [work, setWork] = useState<WorkKind | null>(null);
+  const [liveActivity, setLiveActivity] = useState<ActivityRecord[]>([]);
+  const [activityOffset, setActivityOffset] = useState(0);
+  const [activityStartedAt, setActivityStartedAt] = useState<number | null>(null);
 
   const busy = work !== null;
-  const current = EXAMPLES[example];
+  const current = EXAMPLES[example === "custom" ? "acme" : example];
+  const customerName = parsedCustomer ?? current.customer;
+  const streamItems = liveActivity.slice(activityOffset);
+  const elapsedSeconds = activityStartedAt
+    ? Math.max(1, Math.round((Date.now() - activityStartedAt) / 1000))
+    : 0;
 
   async function refresh() {
     const [commitmentItems, decisionItems, clockItem] = await Promise.all([
@@ -92,6 +103,27 @@ export default function AutopilotPage() {
     refresh().catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    if (work === null) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const items = await request<ActivityRecord[]>("/api/activity");
+        if (!cancelled) setLiveActivity(items);
+      } catch {
+        return;
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => {
+      void tick();
+    }, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [work]);
+
   const phase: Phase = (() => {
     if (work === "investigate") return "working";
     if (riskApproved) return "done";
@@ -101,14 +133,35 @@ export default function AutopilotPage() {
     return "idle";
   })();
 
+  function chooseExample(next: ExampleKey) {
+    setExample(next);
+    setParsedCustomer(null);
+    if (next === "custom") return;
+    setDraft(EXAMPLES[next].request);
+  }
+
   async function assess() {
     setWork("investigate");
     setError("");
     try {
-      const created = await requestJob<{ request: { id: string } }>("/api/requests", {
-        method: "POST",
-        body: JSON.stringify({ text: current.request, recorded: RECORDED, example }),
-      });
+      const existing = await request<ActivityRecord[]>("/api/activity");
+      setActivityOffset(existing.length);
+      setActivityStartedAt(Date.now());
+      setLiveActivity(existing);
+      const created = await requestJob<{ request: { id: string; customer_name?: string } }>(
+        "/api/requests",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            text: draft,
+            recorded: RECORDED,
+            example: example === "nova" ? "nova" : "acme",
+          }),
+        },
+      );
+      if (example === "custom" && created.request.customer_name) {
+        setParsedCustomer(created.request.customer_name);
+      }
       const result = await requestJob<{ assessment: Assessment; decision: Decision }>(
         `/api/requests/${created.request.id}/assess?recorded=${RECORDED}`,
         { method: "POST" },
@@ -199,6 +252,10 @@ export default function AutopilotPage() {
       setRiskCommitment(null);
       setRiskApproved(false);
       setSelectedOption(null);
+      setParsedCustomer(null);
+      setLiveActivity([]);
+      setActivityOffset(0);
+      setActivityStartedAt(null);
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not reset");
@@ -228,7 +285,7 @@ export default function AutopilotPage() {
   const clockDate = clock ? new Date(clock.now) : null;
   const options = riskDecision?.options ?? assessment?.alternatives ?? [];
   const selected = options.find((item) => item.id === selectedOption);
-  const liveCommitment = commitments.find((item) => item.customer_name === current.customer);
+  const liveCommitment = commitments.find((item) => item.customer_name === customerName);
 
   return (
     <div className="grid gap-8">
@@ -265,14 +322,19 @@ export default function AutopilotPage() {
       <NowCard
         phase={phase}
         work={work}
-        customer={current.customer}
+        customer={customerName}
         selectedTitle={selected?.title}
+        draft={draft}
+        example={example}
+        recorded={RECORDED}
+        streamItems={streamItems}
+        elapsedSeconds={elapsedSeconds}
+        onDraft={setDraft}
+        onChooseExample={chooseExample}
         onAssess={assess}
         onApprove={approve}
         onSupplier={sendSupplier}
         onFix={approveRisk}
-        onSwitchExample={() => setExample(example === "acme" ? "nova" : "acme")}
-        otherExample={example === "acme" ? "Nova Health" : "Acme Foods"}
         busy={busy}
       />
 
@@ -285,57 +347,14 @@ export default function AutopilotPage() {
 
       <section className="grid gap-3 sm:grid-cols-4">
         <Stat label="Commitments" value={commitments.length} hint="Jobs already promised" />
-        <Stat label="On track" value={onTrack} hint="Forecast matches the promise" />
-        <Stat label="At risk" value={atRisk} hint="Forecast slipped past the promise" />
-        <Stat label="Needs you" value={openCount} hint="Open decisions only" />
+        <Stat label="On track" value={onTrack} hint="Forecast matches the promise" tone="safe" />
+        <Stat label="At risk" value={atRisk} hint="Forecast slipped past the promise" tone="risk" />
+        <Stat label="Needs you" value={openCount} hint="Open decisions only" tone="risk" />
       </section>
-
-      {phase === "working" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Investigator is working</CardTitle>
-            <CardDescription>
-              Checking remaining hours, existing jobs, supplier windows, and the requested date.
-              This usually takes 20–45 seconds.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-4 w-3/5" />
-          </CardContent>
-        </Card>
-      )}
-
-      {phase === "idle" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Incoming request</CardTitle>
-            <CardDescription>{current.customer} asked if Northstar can take this work.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm">
-            <p className="max-w-2xl text-muted-foreground">{current.request}</p>
-            <div className="flex flex-wrap gap-2 font-mono text-xs text-muted-foreground">
-              <span>Due {current.date}</span>
-              <span>·</span>
-              <span>{current.budget}</span>
-              <span>·</span>
-              <span>{current.scope}</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {(phase === "decide" || phase === "watching") && assessment && (
         <DecisionPanel
-          title={
-            phase === "watching"
-              ? "Promise is live. The Monitor is watching it."
-              : assessment.decision === "SAFE"
-                ? "This date can be kept — if you accept the recommended option."
-                : "The requested date is unsafe."
-          }
-          badge={assessment.decision}
+          badge={phase === "watching" ? "ON TRACK" : assessment.decision}
           facts={[
             ["Requested", current.date],
             ["Budget", current.budget],
@@ -346,12 +365,12 @@ export default function AutopilotPage() {
           selectedId={selectedOption}
           onSelect={setSelectedOption}
           locked={phase !== "decide" || busy}
+          evidenceHref={liveCommitment ? `/commitments/${liveCommitment.id}` : undefined}
         />
       )}
 
       {phase === "at_risk" && riskDecision && (
         <DecisionPanel
-          title="A supplier slipped. The committed date may miss."
           badge="AT RISK"
           facts={[
             ["Committed", riskCommitment?.committed_deadline ?? "—"],
@@ -363,11 +382,12 @@ export default function AutopilotPage() {
           selectedId={selectedOption}
           onSelect={setSelectedOption}
           locked={busy}
+          evidenceHref={riskCommitment ? `/commitments/${riskCommitment.id}` : undefined}
         />
       )}
 
       {phase === "done" && (
-        <Alert>
+        <Alert className="border-safe bg-safe/10">
           <AlertTitle>Backup approved. Nothing is waiting on you.</AlertTitle>
           <AlertDescription>
             The Monitor caught the slip and you chose a fix. Reset demo to walk the loop again.
@@ -392,9 +412,19 @@ export default function AutopilotPage() {
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: number; hint: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  tone?: "safe" | "risk";
+}) {
   return (
-    <Card>
+    <Card className={tone === "safe" ? "border-safe/30" : tone === "risk" ? "border-risk/30" : undefined}>
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
         <CardTitle className="font-mono text-3xl tabular-nums">{value}</CardTitle>
@@ -409,27 +439,42 @@ function NowCard({
   work,
   customer,
   selectedTitle,
+  draft,
+  example,
+  recorded,
+  streamItems,
+  elapsedSeconds,
+  onDraft,
+  onChooseExample,
   onAssess,
   onApprove,
   onSupplier,
   onFix,
-  onSwitchExample,
-  otherExample,
   busy,
 }: {
   phase: Phase;
   work: WorkKind | null;
   customer: string;
   selectedTitle?: string;
+  draft: string;
+  example: ExampleKey;
+  recorded: boolean;
+  streamItems: ActivityRecord[];
+  elapsedSeconds: number;
+  onDraft: (value: string) => void;
+  onChooseExample: (key: ExampleKey) => void;
   onAssess: () => void;
   onApprove: () => void;
   onSupplier: () => void;
   onFix: () => void;
-  onSwitchExample: () => void;
-  otherExample: string;
   busy: boolean;
 }) {
   const copy = nowCopy(phase, work, customer, selectedTitle);
+  const presets: { key: ExampleKey; label: string }[] = [
+    { key: "acme", label: "Acme Foods" },
+    { key: "nova", label: "Nova Health" },
+    { key: "custom", label: "Write your own" },
+  ];
   return (
     <Card className="border-primary/20">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
@@ -440,14 +485,9 @@ function NowCard({
         </div>
         <div className="flex flex-wrap gap-2">
           {phase === "idle" && (
-            <>
-              <Button onClick={onAssess} disabled={busy}>
-                Check feasibility
-              </Button>
-              <Button variant="ghost" onClick={onSwitchExample} disabled={busy}>
-                Use {otherExample} instead
-              </Button>
-            </>
+            <Button onClick={onAssess} disabled={busy || !draft.trim()}>
+              Check feasibility
+            </Button>
           )}
           {phase === "decide" && (
             <Button onClick={onApprove} disabled={busy}>
@@ -466,6 +506,34 @@ function NowCard({
           )}
         </div>
       </CardHeader>
+      <CardContent className="grid gap-4">
+        {phase === "idle" && (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {presets.map((item) => (
+                <Button
+                  key={item.key}
+                  type="button"
+                  size="sm"
+                  variant={example === item.key ? "default" : "outline"}
+                  onClick={() => onChooseExample(item.key)}
+                  disabled={busy}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+            <textarea
+              value={draft}
+              readOnly={recorded}
+              onChange={(event) => onDraft(event.target.value)}
+              rows={4}
+              className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring"
+            />
+          </>
+        )}
+        <ActivityStream items={streamItems} busy={work !== null} elapsedSeconds={elapsedSeconds} />
+      </CardContent>
     </Card>
   );
 }
@@ -527,7 +595,6 @@ function nowCopy(
 }
 
 function DecisionPanel({
-  title,
   badge,
   facts,
   reasons,
@@ -535,47 +602,20 @@ function DecisionPanel({
   selectedId,
   onSelect,
   locked,
+  evidenceHref,
 }: {
-  title: string;
   badge: string;
   facts: [string, string][];
-  reasons: { title: string; detail: string; evidence_ids: string[] }[];
+  reasons: { title: string; detail: string; evidence_ids: string[]; severity?: string }[];
   options: { id: string; title: string; summary: string; extra_cost: { amount: number }; recommended?: boolean }[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   locked: boolean;
+  evidenceHref?: string;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-lg">{title}</CardTitle>
-            <Badge variant={badge === "SAFE" || badge === "ON TRACK" ? "secondary" : "destructive"}>
-              {badge}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-6">
-          <div className="grid grid-cols-3 gap-4">
-            {facts.map(([label, value]) => (
-              <div key={label}>
-                <p className="font-mono text-[11px] text-muted-foreground">{label}</p>
-                <p className="mt-1 text-sm font-medium">{value}</p>
-              </div>
-            ))}
-          </div>
-          <Separator />
-          <div className="grid gap-3">
-            {reasons.slice(0, 4).map((reason) => (
-              <div key={reason.title}>
-                <p className="text-sm font-medium">{reason.title}</p>
-                <p className="text-sm text-muted-foreground">{reason.detail}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <VerdictBanner badge={badge} facts={facts} reasons={reasons} evidenceHref={evidenceHref} />
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Your options</CardTitle>

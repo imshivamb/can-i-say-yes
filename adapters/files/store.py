@@ -62,6 +62,10 @@ def read_runtime(root: Path) -> RuntimeState:
     )
 
 
+def write_activity(root: Path, items: list[ActivityItem]) -> None:
+    _write_list(root / "runtime" / "activity.json", items)
+
+
 def write_runtime(
     root: Path,
     state: RuntimeState,

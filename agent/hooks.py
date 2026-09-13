@@ -40,6 +40,7 @@ class AuthorityAndTraceHooks(HookProvider):
                 commitment_id=arguments.get("commitment_id"),
             )
         )
+        session.persist_activity()
 
         context = PolicyContext(
             now=ensure_tz(session.world.clock.now),
@@ -70,6 +71,7 @@ class AuthorityAndTraceHooks(HookProvider):
                     commitment_id=arguments.get("commitment_id"),
                 )
             )
+            session.persist_activity()
 
     def after_tool_call(self, event: AfterToolCallEvent) -> None:
         session = current_session()
@@ -86,4 +88,5 @@ class AuthorityAndTraceHooks(HookProvider):
                 else None,
             )
         )
+        session.persist_activity()
 

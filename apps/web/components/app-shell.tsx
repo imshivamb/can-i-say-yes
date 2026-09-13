@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, LayoutDashboard, ListChecks } from "lucide-react";
+import { Activity, Globe, LayoutDashboard, ListChecks } from "lucide-react";
 
 import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ const NAV = [
   { href: "/", label: "Autopilot", hint: "Decide on a promise", icon: LayoutDashboard },
   { href: "/commitments", label: "Commitments", hint: "Jobs already promised", icon: ListChecks },
   { href: "/activity", label: "Activity", hint: "What the agent just did", icon: Activity },
+  { href: "/world", label: "Your world", hint: "Where the evidence comes from", icon: Globe },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
