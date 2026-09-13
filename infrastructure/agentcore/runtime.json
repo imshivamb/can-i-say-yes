@@ -1,5 +1,5 @@
 {
-  "name": "can-i-say-yes",
+  "name": "CanISayYes",
   "architecture": "ARM64",
   "containerPort": 8080,
   "healthCheck": {
@@ -15,9 +15,7 @@
   "environment": [
     "AWS_REGION",
     "CISAY_BEDROCK_MODEL",
-    "GMAIL_ACCESS_TOKEN",
-    "GOOGLE_ACCESS_TOKEN",
-    "GOOGLE_CALENDAR_ID",
-    "SES_FROM_ADDRESS"
+    "CISAY_RECORDED",
+    "CISAY_AGENTCORE_SELF"
   ]
 }

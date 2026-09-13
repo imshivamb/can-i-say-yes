@@ -11,6 +11,24 @@ A customer asks, “Can you have this by Friday?” Answering that requires chec
 
 **Track:** Professional Agents — [Agents for Humans Hackathon](https://agentsforhumans.devpost.com/)
 
+## Live demo
+
+Press **Reset** first. This is a shared demo world.
+
+4-click replay:
+
+1. Reset
+2. Check feasibility
+3. Approve option A
+4. Send supplier update, then approve the backup editor
+
+Each live step calls a Strands agent. The public API is App Runner. The same
+container also runs on Amazon Bedrock AgentCore; the API calls
+`InvokeAgentRuntime` when `CISAY_AGENTCORE_RUNTIME_ARN` is set.
+
+- UI: https://can-i-say-yes.vercel.app
+- API: pending AWS deploy (`project-dev` currently lacks ECR / AgentCore / App Runner IAM)
+
 ## Status
 
 The deterministic Sprints 0–5 loop is complete: the Investigator returns an

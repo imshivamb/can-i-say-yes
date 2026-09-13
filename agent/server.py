@@ -12,8 +12,10 @@ from adapters.files.store import read_seed_commitment_ids
 from adapters.files.world import DATA_ROOT, load_world
 from agent.agent import invoke
 from agent.clock import advance_clock
+from agent.config import cors_origins
 from agent.human import approve_decision, fulfill_approved_option, open_decision, reject_decision
 from agent.offline import run_recorded_investigation
+from agent.runtime import apply_session_snapshot
 from agent.session import AgentSession
 from agent.trigger import poll_and_reassess
 from domain.fixtures import acme_campaign_request, nova_launch_request
@@ -22,10 +24,8 @@ from domain.models import WorldEvent
 app = FastAPI(title="Can I Say Yes?", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins(),
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -90,6 +90,7 @@ def invocations(payload: Invocation) -> dict[str, Any]:
     data = payload.input
     kind = data.get("kind")
     session = _new_session()
+    apply_session_snapshot(session, data)
     try:
         if kind == "parse_request":
             result = invoke(session, "parse_request", prompt=data.get("prompt", ""))

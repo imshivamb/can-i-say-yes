@@ -74,3 +74,19 @@ def test_api_allows_browser_preflight_from_local_ui() -> None:
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
+
+def test_api_allows_browser_preflight_from_vercel() -> None:
+    response = client.options(
+        "/api/activity",
+        headers={
+            "Origin": "https://can-i-say-yes-abc123.vercel.app",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.headers["access-control-allow-origin"]
+        == "https://can-i-say-yes-abc123.vercel.app"
+    )
+

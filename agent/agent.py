@@ -10,6 +10,7 @@ from strands.types.exceptions import StructuredOutputException
 
 from agent.config import aws_region, load_prompt, model_id
 from agent.hooks import AuthorityAndTraceHooks
+from agent.runtime import invoke_agentcore, session_snapshot, should_invoke_agentcore
 from agent.schemas.message import CustomerMessageDraft
 from agent.session import AgentSession, ensure_request_id, use_session
 from agent.tools import P0_TOOLS, WRITE_TOOLS
@@ -204,6 +205,66 @@ def assess_request(
     return session.put_assessment(verify_assessment(proposed, session.world, request, session))
 
 
+def _invoke_via_agentcore(
+    session: AgentSession,
+    kind: InvokeKind,
+    *,
+    prompt: str | None,
+    request: ParsedRequest | None,
+    commitment_id: str | None,
+) -> ParsedRequest | FeasibilityAssessment | CustomerMessageDraft:
+    extra: dict[str, Any] = {}
+    if prompt:
+        extra["prompt"] = prompt
+    if request is not None:
+        extra["request"] = request.model_dump(mode="json")
+        extra["request_id"] = request.id
+    if commitment_id:
+        extra["commitment_id"] = commitment_id
+        commitment = next(
+            (item for item in session.world.commitments if item.id == commitment_id),
+            None,
+        )
+        if commitment is not None:
+            extra["commitment"] = commitment.model_dump(mode="json")
+    output = invoke_agentcore(kind, session_snapshot(session), extra)
+    match kind:
+        case "parse_request":
+            return session.put_request(ParsedRequest.model_validate(output))
+        case "assess_feasibility":
+            return session.put_assessment(FeasibilityAssessment.model_validate(output))
+        case "reassess_commitment":
+            if commitment_id is None:
+                raise ValueError("reassess_commitment requires commitment_id")
+            commitment = next(item for item in session.world.commitments if item.id == commitment_id)
+            if request is None:
+                request = session.requests.get(commitment.request_id)
+            if request is None:
+                raise ValueError("reassess_commitment requires the committed request")
+            handoff = session.record_handoff(
+                AgentHandoff(
+                    id=new_id("hnd"),
+                    source_agent="monitor",
+                    target_agent="investigator",
+                    kind="reassessment",
+                    request_id=request.id,
+                    commitment_id=commitment_id,
+                    created_at=session.world.clock.now,
+                )
+            )
+            assessment = FeasibilityAssessment.model_validate(output)
+            session.put_assessment(assessment)
+            apply_reassessment(session.world, commitment, assessment)
+            session.handoffs[-1] = handoff.model_copy(
+                update={"assessment_id": assessment.id, "status": "completed"}
+            )
+            return assessment
+        case "draft_customer_message":
+            return CustomerMessageDraft.model_validate(output)
+        case _ as unreachable:
+            return _assert_never(unreachable)
+
+
 def invoke(
     session: AgentSession,
     kind: InvokeKind,
@@ -213,6 +274,14 @@ def invoke(
     commitment_id: str | None = None,
     callback_handler: Callable[..., Any] | None = None,
 ) -> ParsedRequest | FeasibilityAssessment | CustomerMessageDraft:
+    if should_invoke_agentcore():
+        return _invoke_via_agentcore(
+            session,
+            kind,
+            prompt=prompt,
+            request=request,
+            commitment_id=commitment_id,
+        )
     with use_session(session):
         match kind:
             case "parse_request":

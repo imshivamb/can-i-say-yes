@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.12-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -9,10 +9,12 @@ COPY agent ./agent
 COPY adapters ./adapters
 COPY domain ./domain
 COPY data ./data
-COPY docs ./docs
+COPY infrastructure/agentcore/entrypoint.sh /app/entrypoint.sh
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+RUN chmod +x /app/entrypoint.sh \
+    && pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir . \
+    && pip install --no-cache-dir "aws-opentelemetry-distro>=0.19.0"
 
 EXPOSE 8080
-CMD ["uvicorn", "agent.server:app", "--host", "0.0.0.0", "--port", "8080"]
+ENTRYPOINT ["/app/entrypoint.sh"]
