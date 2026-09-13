@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from adapters.files.store import read_seed_commitment_ids
+from adapters.files.store import read_runtime
 from adapters.files.world import DATA_ROOT, load_world
 from agent import agent as agent_module
 from agent.config import cors_origins
@@ -70,6 +71,13 @@ def test_invoke_uses_agentcore_when_runtime_arn_is_set(tmp_path: Path, monkeypat
     assert isinstance(captured["snapshot"]["clock"], dict)
     assert parsed.id == request.id
     assert session.requests[request.id].customer_name == "Acme Foods"
+
+
+def test_read_runtime_uses_default_clock_when_runtime_is_empty(tmp_path: Path) -> None:
+    (tmp_path / "runtime").mkdir()
+    state = read_runtime(tmp_path)
+    assert state.clock.timezone == "Asia/Kolkata"
+    assert state.commitments == []
 
 
 def test_apply_session_snapshot_replaces_clock(tmp_path: Path) -> None:

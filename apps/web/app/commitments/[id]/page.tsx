@@ -1,40 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { use, useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-type Commitment = {
-  id: string;
-  customer_name: string;
-  title: string;
-  scope_summary: string;
-  original_deadline: string;
-  committed_deadline: string;
-  current_forecast: string | null;
-  health: string | null;
-  assessment_id: string;
-  extra_cost: { amount: number };
-};
-
-type Assessment = {
-  reasons: {
-    title: string;
-    detail: string;
-    severity: string;
-    evidence_ids: string[];
-  }[];
-  evidence: { id: string; source_name: string; source_reference: string; content: string }[];
-};
-
-type Decision = {
-  id: string;
-  commitment_id: string | null;
-  status: string;
-  reason: string;
-  recommended_option_id: string | null;
-  options: { id: string; title: string; summary: string; extra_cost: { amount: number } }[];
-};
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  type Assessment,
+  type Commitment,
+  type Decision,
+  formatDate,
+  healthLabel,
+  money,
+  request,
+} from "@/lib/api";
 
 type Evidence = {
   id: string;
@@ -43,15 +26,6 @@ type Evidence = {
   content: string;
   as_of: string;
 };
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
 
 export default function CommitmentDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -63,16 +37,19 @@ export default function CommitmentDetail({ params }: { params: Promise<{ id: str
 
   async function load() {
     const current = await request<Commitment>(`/api/commitments/${id}`);
-    const [currentAssessment, decisions] = await Promise.all([
-      request<Assessment>(`/api/assessments/${current.assessment_id}`),
-      request<Decision[]>("/api/decisions"),
-    ]);
+    const decisions = await request<Decision[]>("/api/decisions");
+    let currentAssessment: Assessment | null = null;
+    if (current.assessment_id) {
+      try {
+        currentAssessment = await request<Assessment>(`/api/assessments/${current.assessment_id}`);
+      } catch {
+        currentAssessment = null;
+      }
+    }
     setCommitment(current);
     setAssessment(currentAssessment);
     setDecision(
-      decisions.find(
-        (item) => item.commitment_id === current.id && item.status === "OPEN",
-      ) ?? null,
+      decisions.find((item) => item.commitment_id === current.id && item.status === "OPEN") ?? null,
     );
   }
 
@@ -105,76 +82,151 @@ export default function CommitmentDetail({ params }: { params: Promise<{ id: str
     await load();
   }
 
-  if (error) return <main className="content"><div className="error-banner">⚠ {error}</div></main>;
-  if (!commitment || !assessment) return <main className="content"><p>Loading commitment…</p></main>;
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Could not load</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+  if (!commitment) {
+    return (
+      <div className="grid gap-3">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
 
-  const healthClass = commitment.health === "ON_TRACK" ? "status-calm" : "status-danger";
-  const recommendation = decision?.options.find(
-    (option) => option.id === decision.recommended_option_id,
-  );
+  const recommendation = decision?.options?.find((option) => option.id === decision.recommended_option_id);
 
   return (
-    <main className="content">
-      <div className="section-heading">
+    <div className="grid gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <span className="section-kicker">COMMITMENT DETAIL</span>
-          <h1>{commitment.customer_name}</h1>
-          <p className="intro">{commitment.title} · {commitment.scope_summary}</p>
+          <p className="font-mono text-xs text-muted-foreground">
+            <Link href="/commitments" className="hover:underline">
+              Commitments
+            </Link>
+            {" / "}
+            {commitment.id}
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">{commitment.customer_name}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{commitment.title}</p>
         </div>
-        <a className="ghost-button" href="/">← Autopilot</a>
+        <Badge variant={commitment.health === "AT_RISK" ? "destructive" : "secondary"}>
+          {healthLabel(commitment.health)}
+        </Badge>
       </div>
 
-      <section className="metric-grid">
-        <div className="metric-card"><div><small>STATUS</small><strong><span className={`status-pill ${healthClass}`}><i /> {commitment.health ?? "UNKNOWN"}</span></strong></div></div>
-        <div className="metric-card"><div><small>ORIGINAL COMMITMENT</small><strong>{commitment.committed_deadline}</strong></div></div>
-        <div className="metric-card"><div><small>CURRENT FORECAST</small><strong>{commitment.current_forecast ?? "—"}</strong></div></div>
-        <div className="metric-card"><div><small>EXTRA COST</small><strong>₹{commitment.extra_cost.amount.toLocaleString("en-IN")}</strong></div></div>
-      </section>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardDescription>Committed</CardDescription>
+            <CardTitle className="font-mono text-lg">{formatDate(commitment.committed_deadline)}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Forecast</CardDescription>
+            <CardTitle className="font-mono text-lg">{formatDate(commitment.current_forecast)}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Extra cost</CardDescription>
+            <CardTitle className="font-mono text-lg">
+              {money(commitment.extra_cost?.amount ?? 0)}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
 
-      <section className="decision-layout">
-        <article className="decision-card card-surface">
-          <div className="side-card-heading"><div><span className="section-kicker">WHY</span><h2>Operating reasons</h2></div></div>
-          <div className="reasons-list">
-            {assessment.reasons.map((reason) => (
-              <div className="reason-row" key={reason.title}>
-                <div><strong>{reason.title}</strong><p>{reason.detail}</p><small>{reason.severity.toUpperCase()}</small></div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Assessment</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {assessment ? (
+              assessment.reasons.map((reason) => (
+                <div key={reason.title}>
+                  <p className="text-sm font-medium">{reason.title}</p>
+                  <p className="text-sm text-muted-foreground">{reason.detail}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No assessment on file.</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Decision</CardTitle>
+            {decision && <CardDescription>{decision.reason}</CardDescription>}
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {recommendation && (
+              <p className="text-sm">
+                Recommended: <span className="font-medium">{recommendation.title}</span>{" "}
+                <span className="text-muted-foreground">({money(recommendation.extra_cost.amount)})</span>
+              </p>
+            )}
+            {decision?.status === "OPEN" && (
+              <div className="flex gap-2">
+                <Button onClick={approve}>Approve</Button>
+                <Button variant="outline" onClick={reject}>
+                  Reject
+                </Button>
               </div>
-            ))}
-          </div>
-        </article>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-        <aside className="options-card card-surface">
-          <div className="side-card-heading"><div><span className="section-kicker">RECOMMENDATION</span><h2>{recommendation?.title ?? "No open decision"}</h2></div></div>
-          <p className="intro">{decision?.reason ?? "This commitment is currently being monitored."}</p>
-          {recommendation && <p className="intro">Additional cost: ₹{recommendation.extra_cost.amount.toLocaleString("en-IN")}</p>}
-          {decision?.status === "OPEN" && (
-            <div className="decision-footer">
-              <button className="primary-button" onClick={approve}>APPROVE</button>
-              <button className="ghost-button" onClick={reject}>REJECT</button>
-            </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Evidence</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          {(assessment?.evidence ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">None cited.</p>
+          ) : (
+            (assessment?.evidence ?? []).map((evidence) => (
+              <button
+                key={evidence.id}
+                type="button"
+                className="rounded-lg border border-border px-3 py-2 text-left hover:bg-muted/40"
+                onClick={() => showEvidence(evidence.id)}
+              >
+                <p className="text-sm font-medium">{evidence.source_name}</p>
+                <p className="font-mono text-xs text-muted-foreground">{evidence.source_reference}</p>
+              </button>
+            ))
           )}
-        </aside>
-      </section>
-
-      <section className="card-surface" style={{ marginTop: 20, padding: 24 }}>
-        <div className="side-card-heading"><div><span className="section-kicker">EVIDENCE</span><h2>Sources behind this commitment</h2></div></div>
-        <div className="reasons-list">
-          {assessment.evidence.map((evidence) => (
-            <button className="option-row" type="button" key={evidence.id} onClick={() => showEvidence(evidence.id)}>
-              <div className="option-copy"><strong>{evidence.source_name}</strong><p>{evidence.source_reference}</p></div>
-              <span className="option-check">OPEN</span>
-            </button>
-          ))}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
       {selectedEvidence && (
-        <aside className="card-surface" style={{ marginTop: 20, padding: 24 }}>
-          <div className="side-card-heading"><div><span className="section-kicker">EVIDENCE SOURCE</span><h2>{selectedEvidence.source_name}</h2></div><button className="ghost-button" onClick={() => setSelectedEvidence(null)}>Close</button></div>
-          <p className="intro">{selectedEvidence.content}</p>
-          <small>{selectedEvidence.source_reference} · as of {selectedEvidence.as_of}</small>
-        </aside>
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between">
+            <div>
+              <CardTitle>{selectedEvidence.source_name}</CardTitle>
+              <CardDescription className="font-mono">
+                {selectedEvidence.source_reference} · {selectedEvidence.as_of}
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedEvidence(null)}>
+              Close
+            </Button>
+          </CardHeader>
+          <Separator />
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{selectedEvidence.content}</p>
+          </CardContent>
+        </Card>
       )}
-    </main>
+    </div>
   );
 }

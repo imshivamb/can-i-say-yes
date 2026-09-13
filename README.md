@@ -1,86 +1,126 @@
 # Can I Say Yes?
 
-**Before you promise a customer, let the agent check reality.**
+Before you promise a customer, let the agent check reality.
 
-An autonomous commitment-feasibility agent for small professional-services teams.
-
-A customer asks, “Can you have this by Friday?” Answering that requires checking current work, people, existing commitments, suppliers, calendars, files, and dependencies. That picture is usually assembled by hand. This agent investigates it, returns **SAFE / UNSAFE / UNKNOWN** with evidence, proposes alternatives when the answer is no, and keeps watching after a commitment is made.
-
-> Capacity software tells you what capacity you have.
-> This agent investigates whether a **specific promise** is safe to make.
-
-**Track:** Professional Agents — [Agents for Humans Hackathon](https://agentsforhumans.devpost.com/)
-
-## Live demo
+[Live demo](https://can-i-say-yes.vercel.app) · [Architecture](architecture/architecture.png) · Track: Professional Agents — [Agents for Humans](https://agentsforhumans.devpost.com/)
 
 Press **Reset** first. This is a shared demo world.
 
-4-click replay:
+## The problem in one paragraph
 
-1. Reset
-2. Check feasibility
-3. Approve option A
-4. Send supplier update, then approve the backup editor
+A customer asks “can you have this by Friday?” Answering that means checking current work, people, existing promises, suppliers, calendars, and what the customer still owes you. That picture is usually assembled by hand, so people guess. Capacity software tells you what capacity you have. This agent investigates whether a **specific promise** is safe to make, and keeps watching after you say yes.
 
-Each live step calls a Strands agent. The public API is App Runner. The same
-container also runs on Amazon Bedrock AgentCore; the API calls
-`InvokeAgentRuntime` when `CISAY_AGENTCORE_RUNTIME_ARN` is set.
+## What the agent does
 
-- UI: https://can-i-say-yes.vercel.app
-- API: pending AWS deploy (`project-dev` currently lacks ECR / AgentCore / App Runner IAM)
+1. Parse the request.
+2. Investigate scattered evidence (commitments, capacity, suppliers, calendar, email, documents).
+3. Return **SAFE / UNSAFE / UNKNOWN** with cited sources and alternatives.
+4. Wait for a human before any consequential write.
+5. Write the commitment and watch it.
+6. When the world changes, the Monitor re-evaluates and asks only if money or the promise must move.
 
-## Status
+## 90-second judge replay
 
-The deterministic Sprints 0–5 loop is complete: the Investigator returns an
-evidence-backed `UNSAFE`, a human approves an alternative, and the Monitor
-re-evaluates a supplier delay into an `AT_RISK` decision. The HTTP API,
-Gmail/Calendar/SES adapters, exactly-two-agent boundary, hook enforcement, and
-30-case deterministic evaluation suite are also implemented. Live AWS
-credentials and AgentCore deployment are environment-dependent.
+UI: https://can-i-say-yes.vercel.app
 
-```text
-source .venv/bin/activate   # Python 3.12
-pytest -q
-python -m agent.cli --recorded
-# With Bedrock credentials:
-python -m agent.cli
-# Run the deterministic proof suite:
-python -m evals.run
-# Start the local API:
-uvicorn agent.server:app --reload --port 8080
-```
+1. **Reset demo**
+2. **Check feasibility** — wait 20–45s. Investigator runs live on Bedrock.
+3. **Approve** the recommended option.
+4. **Simulate supplier delay** — Monitor re-opens an AT RISK decision.
+5. **Approve** the backup editor.
 
-## Product in one loop
+API: `http://54.237.149.227:8080` (`GET /ping` → Healthy)
 
-Customer request → investigate scattered evidence → feasibility decision → human approval → commitment → background watch → world changes → re-evaluate → escalate only if a decision is required.
+## What is real and what is simulated
 
-## Judge replay
+**Real**
 
-```text
-POST /api/demo/reset
-POST /api/requests {"text":"...","recorded":true}
-POST /api/requests/{request_id}/assess?recorded=true
-POST /api/decisions/{decision_id}/approve {"option_id":"alt_a"}
-POST /api/clock/advance {"to":"2026-09-19T10:00:00+05:30"}
-```
+- Two Strands agents (Investigator, Monitor) with `investigator.as_tool` handoff
+- Live Bedrock Mantle model (`zai.glm-4.7-flash`) on every public demo step
+- Deterministic schedule / capacity / conflict / freshness / policy engine
+- `AuthorityAndTraceHooks` cancel unapproved writes before the tool runs
+- FastAPI `/invocations` + `/ping` AgentCore HTTP contract
+- Next.js Autopilot, Commitments, and Activity on Vercel
+- Public API on a free-plan EC2 `t3.micro`
 
-The simulation clock is a deterministic fallback. The primary live path polls
-Gmail for an inbound supplier message, reads Google Calendar as the live
-capacity evidence source, and sends approved customer messages through SES.
+**Simulated / not deployed**
 
-## Simulated company
+- Northstar Creative and Acme Foods are a seeded operating world
+- The public demo uses the file-backed world, not a live Gmail/Calendar/SES account
+- App Runner is not used (paid-only on this AWS account)
+- AgentCore Runtime is wired (`CISAY_AGENTCORE_RUNTIME_ARN`) but **does not host** the public demo; agents run in-process on EC2
+- Live eval suite against Bedrock is not claimed here — see measured results
 
-The demo world is **Northstar Creative**, a 10-person digital agency. The
-canonical customer is **Acme Foods**. This is a bounded operational world with
-provider ports, not a fake Salesforce integration. External messages remain
-untrusted data.
+## Architecture
 
-## Measured local proof
+![Architecture](architecture/architecture.png)
 
-The current deterministic suite reports 30 scenarios, including 5 prompt
-injection cases. Run `python -m evals.run` to regenerate the local result; do
-not copy a result into submission text until it has been rerun after the final
-changes.
+Three layers. Strands agents choose what evidence to gather. Deterministic code verifies dates, capacity, conflicts, and authority. Humans approve exceptions. The product API can call `InvokeAgentRuntime` when an ARN is set; today that env var is unset on EC2 so the same code path runs in-process.
+
+## How Strands is used
+
+- `build_investigator` — parse, assess, draft. Read tools + domain tools. Structured output into Pydantic models.
+- `build_monitor` — reassess after the world changes. Same read tools, write tools, plus `investigator.as_tool`.
+- Dates and capacity are never computed by the model. `calculate_schedule`, `check_conflicts`, and `find_alternatives` are domain tools.
+- `AuthorityAndTraceHooks` record every tool call and cancel writes the policy engine does not allow.
+- The same FastAPI app serves `/api/*` for the UI and `/invocations` for AgentCore.
+
+## AWS services actually used
+
+- Amazon Bedrock Mantle (chat completions) for the Strands model
+- EC2 (`t3.micro`) for the public FastAPI process
+- IAM instance role for `bedrock-mantle:*`
+- Vercel for the Next.js UI (proxies `/api/*` to EC2)
+
+Not in the live path: App Runner, AgentCore Runtime hosting, CloudWatch Transaction Search screenshot.
+
+## Measured results
+
+Deterministic verification layer (`python -m evals.run`, [evals/results/latest.json](evals/results/latest.json)):
+
+- 30/30 scenarios correct
+- 0 unsupported SAFE
+- 100% evidence grounded
+- 5/5 prompt-injection cases ignored
+
+This measures the recorded engine and policy layer, not the live Bedrock agent. Do not read it as “the LLM ignored five injections.”
+
+## Run locally
+
+Python 3.12. From a fresh clone:
+
+1. `python3.12 -m venv .venv && source .venv/bin/activate`
+2. `pip install -e ".[dev]"`
+3. `cp .env.example .env` and set Bedrock/AWS credentials if you want the live loop
+4. `pytest -q`
+5. `python -m evals.run`
+6. `python -m agent.cli --recorded`
+7. `CISAY_RECORDED=0 uvicorn agent.server:app --reload --port 8080`
+8. `cd apps/web && npm install && npm run dev` — UI at http://localhost:3000, API at http://localhost:8080
+
+## Deploy
+
+- UI: `apps/web` on Vercel. Production rewrite `API_PROXY_URL=http://54.237.149.227:8080`.
+- API: `infrastructure/ec2/deploy.sh` builds a free-plan EC2 box, clones this repo, overlays `agent/server.py`.
+- AgentCore: `infrastructure/agentcore/` has the `/invocations` contract and launch scripts. Not required for the public 4-click loop.
+
+## Security posture
+
+- Tool allowlist only. No shell tool.
+- Untrusted email and documents are data, not instructions. Injection cases in the eval suite stay `UNSAFE`.
+- Consequential writes (`create_commitment`, `send_customer_message`, …) require an approved decision. The Strands hook cancels the tool if policy says no.
+
+## Repo map
+
+- `agent/` — Strands agents, hooks, tools, FastAPI server
+- `domain/` — schedule, capacity, conflicts, state machine
+- `adapters/` — file world, Gmail/Calendar/SES ports
+- `apps/web/` — Autopilot UI
+- `evals/` — 30-case deterministic suite
+- `infrastructure/` — EC2, IAM, AgentCore, App Runner (unused)
+- `data/` — Northstar seed + runtime
+- `tests/` — pytest
+- `architecture/` — diagram
 
 ## License
 

@@ -1,151 +1,115 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-const RECORDED = process.env.NEXT_PUBLIC_RECORDED === "1";
-const REQUEST_TEXT =
-  "We'd like 12 social creatives, a landing page and three short videos for our September campaign. Can you have everything ready by September 18 for ₹4.2 lakh?";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  type Assessment,
+  type Clock,
+  type Commitment,
+  type Decision,
+  RECORDED,
+  healthLabel,
+  money,
+  request,
+  requestJob,
+} from "@/lib/api";
+
 type ExampleKey = "acme" | "nova";
-const EXAMPLES: Record<ExampleKey, {
-  customer: string;
-  initials: string;
-  scope: string;
-  request: string;
-  date: string;
-  budget: string;
-}> = {
+const EXAMPLES: Record<
+  ExampleKey,
+  { customer: string; request: string; date: string; budget: string; scope: string }
+> = {
   acme: {
     customer: "Acme Foods",
-    initials: "AF",
-    scope: "September campaign",
-    request: REQUEST_TEXT,
+    request:
+      "We'd like 12 social creatives, a landing page and three short videos for our September campaign. Can you have everything ready by September 18 for ₹4.2 lakh?",
     date: "18 September",
     budget: "₹4,20,000",
+    scope: "12 creatives, 1 landing page, 3 videos",
   },
   nova: {
     customer: "Nova Health",
-    initials: "NH",
-    scope: "Product launch site",
     request: "Can Northstar build our product launch site with six pages by October 9 for ₹5.2 lakh?",
     date: "09 October",
     budget: "₹5,20,000",
+    scope: "6-page launch site",
   },
 };
 
-type Assessment = {
-  decision: string;
-  confidence?: number;
-  reasons: { title: string; detail: string; evidence_ids: string[] }[];
-  alternatives: {
-    id: string;
-    title: string;
-    summary: string;
-    extra_cost: { amount: number };
-    recommended?: boolean;
-  }[];
-};
+type Phase = "idle" | "working" | "decide" | "watching" | "at_risk" | "done";
+type WorkKind = "investigate" | "approve" | "supplier" | "fix" | "reset" | "clock";
 
-type Decision = {
-  id: string;
-  commitment_id?: string | null;
-  status?: string;
-  recommended_option_id?: string | null;
-  reason: string;
-  options?: { id: string; title: string; summary: string; extra_cost: { amount: number } }[];
-};
-type Commitment = {
-  id?: string;
-  request_id?: string;
-  health?: string | null;
-  committed_deadline?: string;
-  current_forecast?: string | null;
-};
-type StoredDecision = { status: string };
-type Clock = { now: string };
-type ActivityRecord = { text: string };
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
-
-export default function Home() {
+export default function AutopilotPage() {
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [decision, setDecision] = useState<Decision | null>(null);
-  const [activity, setActivity] = useState<string[]>([]);
-  const [message, setMessage] = useState("Your autopilot is standing by.");
-  const [busy, setBusy] = useState(false);
-  const [approved, setApproved] = useState(false);
-  const [riskDetected, setRiskDetected] = useState(false);
-  const [error, setError] = useState("");
-  const [activeNav, setActiveNav] = useState("Autopilot");
-  const [selectedExample, setSelectedExample] = useState<ExampleKey>("acme");
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
-  const [decisions, setDecisions] = useState<StoredDecision[]>([]);
+  const [openCount, setOpenCount] = useState(0);
   const [clock, setClock] = useState<Clock | null>(null);
+  const [approved, setApproved] = useState(false);
   const [riskDecision, setRiskDecision] = useState<Decision | null>(null);
   const [riskCommitment, setRiskCommitment] = useState<Commitment | null>(null);
   const [riskApproved, setRiskApproved] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [example, setExample] = useState<ExampleKey>("acme");
+  const [error, setError] = useState("");
+  const [work, setWork] = useState<WorkKind | null>(null);
 
-  async function refreshDashboard() {
-    const [commitmentItems, decisionItems, activityItems, clockItem] = await Promise.all([
+  const busy = work !== null;
+  const current = EXAMPLES[example];
+
+  async function refresh() {
+    const [commitmentItems, decisionItems, clockItem] = await Promise.all([
       request<Commitment[]>("/api/commitments"),
-      request<StoredDecision[]>("/api/decisions"),
-      request<ActivityRecord[]>("/api/activity"),
+      request<Decision[]>("/api/decisions"),
       request<Clock>("/api/clock"),
     ]);
     setCommitments(commitmentItems);
-    setDecisions(decisionItems);
-    setActivity(activityItems.map((item) => item.text));
+    setOpenCount(decisionItems.filter((item) => item.status === "OPEN").length);
     setClock(clockItem);
   }
 
-  async function loadRiskDecision() {
+  async function loadRisk() {
     const [openDecisions, currentCommitments] = await Promise.all([
       request<Decision[]>("/api/decisions"),
       request<Commitment[]>("/api/commitments"),
     ]);
-    const opened = openDecisions.find(
-      (item) => item.status === "OPEN" && item.commitment_id,
-    );
+    const opened = openDecisions.find((item) => item.status === "OPEN" && item.commitment_id);
     setRiskDecision(opened ?? null);
     setRiskCommitment(
-      opened
-        ? currentCommitments.find((item) => item.id === opened.commitment_id) ?? null
-        : null,
+      opened ? (currentCommitments.find((item) => item.id === opened.commitment_id) ?? null) : null,
     );
     setSelectedOption(opened?.recommended_option_id ?? null);
   }
 
   useEffect(() => {
-    refreshDashboard().catch(() => undefined);
+    refresh().catch(() => undefined);
   }, []);
 
-  function navigate(label: string, target: string) {
-    setActiveNav(label);
-    document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  const phase: Phase = (() => {
+    if (work === "investigate") return "working";
+    if (riskApproved) return "done";
+    if (riskDecision) return "at_risk";
+    if (approved) return "watching";
+    if (assessment && decision && !approved) return "decide";
+    return "idle";
+  })();
 
   async function assess() {
-    setBusy(true);
+    setWork("investigate");
     setError("");
-    setMessage("Investigator is checking the operating picture…");
     try {
-      const created = await request<{ request: { id: string } }>("/api/requests", {
+      const created = await requestJob<{ request: { id: string } }>("/api/requests", {
         method: "POST",
-        body: JSON.stringify({
-          text: EXAMPLES[selectedExample].request,
-          recorded: RECORDED,
-          example: selectedExample,
-        }),
+        body: JSON.stringify({ text: current.request, recorded: RECORDED, example }),
       });
-      const result = await request<{ assessment: Assessment; decision: Decision }>(
+      const result = await requestJob<{ assessment: Assessment; decision: Decision }>(
         `/api/requests/${created.request.id}/assess?recorded=${RECORDED}`,
         { method: "POST" },
       );
@@ -154,43 +118,39 @@ export default function Home() {
       setSelectedOption(
         result.decision.recommended_option_id ?? result.assessment.alternatives[0]?.id ?? null,
       );
-      await refreshDashboard();
-      setMessage("Investigation complete. One decision needs your attention.");
+      await refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong");
-      setMessage("The investigation could not be completed.");
+      setError(caught instanceof Error ? caught.message : "Investigation failed");
     } finally {
-      setBusy(false);
+      setWork(null);
     }
   }
 
   async function approve() {
     if (!decision) return;
-    setBusy(true);
+    setWork("approve");
+    setError("");
     try {
       await request(`/api/decisions/${decision.id}/approve`, {
         method: "POST",
-        body: JSON.stringify({ option_id: selectedOption ?? decision.recommended_option_id ?? "alt_a" }),
+        body: JSON.stringify({
+          option_id: selectedOption ?? decision.recommended_option_id ?? "alt_a",
+        }),
       });
       setApproved(true);
-      await refreshDashboard();
-      setMessage("Commitment created. Northstar is now watching it in the background.");
+      await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Approval failed");
     } finally {
-      setBusy(false);
+      setWork(null);
     }
   }
 
-  const selectedOptionIndex =
-    assessment?.alternatives.findIndex((option) => option.id === selectedOption) ?? -1;
-  const selectedOptionLabel =
-    selectedOptionIndex >= 0 ? `Option ${String.fromCharCode(65 + selectedOptionIndex)}` : "selected option";
-
-  async function simulateSupplierEmail() {
-    setBusy(true);
+  async function sendSupplier() {
+    setWork("supplier");
+    setError("");
     try {
-      const result = await request<{ opened_decisions: number }>("/api/events/inbound", {
+      await requestJob<{ opened_decisions: number }>("/api/events/inbound", {
         method: "POST",
         body: JSON.stringify({
           event_id: `evt_demo_${Date.now()}`,
@@ -199,240 +159,458 @@ export default function Home() {
           payload: { supplier_id: "sup_frame_grain", available_from: "2026-09-20" },
         }),
       });
-      setRiskDetected(result.opened_decisions > 0);
-      await refreshDashboard();
-      if (result.opened_decisions > 0) await loadRiskDecision();
-      setMessage("Monitor woke up from the supplier email and caught the delivery risk.");
+      await refresh();
+      await loadRisk();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Supplier update failed");
     } finally {
-      setBusy(false);
+      setWork(null);
     }
   }
 
   async function approveRisk() {
     if (!riskDecision || !selectedOption) return;
-    setBusy(true);
+    setWork("fix");
+    setError("");
     try {
       await request(`/api/decisions/${riskDecision.id}/approve`, {
         method: "POST",
         body: JSON.stringify({ option_id: selectedOption }),
       });
       setRiskApproved(true);
-      await refreshDashboard();
-      setMessage("Backup capacity approved. The commitment is back on track.");
+      setRiskDecision(null);
+      await refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Risk approval failed");
+      setError(caught instanceof Error ? caught.message : "Could not approve the fix");
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function advanceTime() {
-    setBusy(true);
-    try {
-      const result = await request<{ opened_decisions: number }>("/api/clock/advance", {
-        method: "POST",
-        body: JSON.stringify({ to: "supplier_delay", recorded: RECORDED }),
-      });
-      setRiskDetected(result.opened_decisions > 0);
-      await refreshDashboard();
-      if (result.opened_decisions > 0) await loadRiskDecision();
-      setMessage("The simulation clock advanced and the Monitor checked affected commitments.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not advance time");
-    } finally {
-      setBusy(false);
+      setWork(null);
     }
   }
 
   async function resetDemo() {
-    setBusy(true);
+    setWork("reset");
+    setError("");
     try {
       await request("/api/demo/reset", { method: "POST" });
       setAssessment(null);
       setDecision(null);
       setApproved(false);
-      setRiskDetected(false);
       setRiskDecision(null);
       setRiskCommitment(null);
       setRiskApproved(false);
-      await refreshDashboard();
-      setMessage("Your autopilot is standing by.");
+      setSelectedOption(null);
+      await refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not reset demo");
+      setError(caught instanceof Error ? caught.message : "Could not reset");
     } finally {
-      setBusy(false);
+      setWork(null);
     }
   }
 
-  const monitoredCount = commitments.length;
-  const onTrackCount = commitments.filter((item) => item.health === "ON_TRACK").length;
-  const atRiskCount = commitments.filter((item) => item.health === "AT_RISK").length;
-  const needsYouCount = decisions.filter((item) => item.status === "OPEN").length;
-  const routineActionsCount = activity.filter(
-    (item) => !/decision|approved|commitment created/i.test(item),
-  ).length;
-  const humanDecisionCount = decisions.length;
+  async function advanceTime() {
+    setWork("clock");
+    try {
+      await requestJob("/api/clock/advance", {
+        method: "POST",
+        body: JSON.stringify({ to: "supplier_delay", recorded: RECORDED }),
+      });
+      await refresh();
+      await loadRisk();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not advance time");
+    } finally {
+      setWork(null);
+    }
+  }
+
+  const onTrack = commitments.filter((item) => item.health === "ON_TRACK").length;
+  const atRisk = commitments.filter((item) => item.health === "AT_RISK").length;
   const clockDate = clock ? new Date(clock.now) : null;
-  const dateLabel = clockDate
-    ? clockDate.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-    : "Loading operating clock…";
-  const timeLabel = clockDate
-    ? clockDate.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })
-    : "—";
+  const options = riskDecision?.options ?? assessment?.alternatives ?? [];
+  const selected = options.find((item) => item.id === selectedOption);
+  const liveCommitment = commitments.find((item) => item.customer_name === current.customer);
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand-lockup">
-          <div className="brand-mark">↗</div>
-          <div><strong>can i say yes?</strong><span>northstar creative</span></div>
+    <div className="grid gap-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-mono text-xs text-muted-foreground">
+            {clockDate
+              ? clockDate.toLocaleString("en-IN", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+              : "Loading studio clock…"}
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Good morning, Shivam.</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            Before Northstar promises a date, the Investigator checks capacity, calendars, and
+            suppliers. After you commit, the Monitor watches for slips.
+          </p>
         </div>
-        <nav>
-          <p className="nav-label">WORKSPACE</p>
-          <button className={`nav-item ${activeNav === "Autopilot" ? "active" : ""}`} onClick={() => navigate("Autopilot", "autopilot")}><span>◈</span> Autopilot <b>{needsYouCount}</b></button>
-          <button className={`nav-item ${activeNav === "Commitments" ? "active" : ""}`} onClick={() => navigate("Commitments", "metrics")}><span>◌</span> Commitments <b>{monitoredCount}</b></button>
-          <button className={`nav-item ${activeNav === "Evidence" ? "active" : ""}`} onClick={() => navigate("Evidence", "decisions")}><span>⌁</span> Evidence</button>
-          <button className={`nav-item ${activeNav === "Activity" ? "active" : ""}`} onClick={() => navigate("Activity", "activity")}><span>↗</span> Activity</button>
-          <p className="nav-label nav-spacer">SYSTEM</p>
-          <button className={`nav-item ${activeNav === "Connections" ? "active" : ""}`} onClick={() => navigate("Connections", "connections")}><span>◒</span> Connections <i className="live-dot" /></button>
-          <button className={`nav-item ${activeNav === "Settings" ? "active" : ""}`} onClick={() => navigate("Settings", "settings")}><span>⚙</span> Settings</button>
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="agent-orb"><span /></div>
-          <div><strong>Agent online</strong><small>Monitoring Northstar</small></div>
-          <span className="pulse" />
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={advanceTime} disabled={busy}>
+            Advance clock
+          </Button>
+          <Button variant="outline" size="sm" onClick={resetDemo} disabled={busy}>
+            Reset demo
+          </Button>
         </div>
-      </aside>
+      </div>
 
-      <section className="workspace">
-        <header className="topbar">
-          <div className="crumbs"><span>Northstar Creative</span><b>/</b><strong>Autopilot</strong></div>
-          <div className="top-actions">
-            <span className="sync"><i className="live-dot" /> Last synced just now</span>
-            <button className="icon-button">?</button><div className="avatar">PS</div>
-          </div>
-        </header>
+      <NowCard
+        phase={phase}
+        work={work}
+        customer={current.customer}
+        selectedTitle={selected?.title}
+        onAssess={assess}
+        onApprove={approve}
+        onSupplier={sendSupplier}
+        onFix={approveRisk}
+        onSwitchExample={() => setExample(example === "acme" ? "nova" : "acme")}
+        otherExample={example === "acme" ? "Nova Health" : "Acme Foods"}
+        busy={busy}
+      />
 
-        <div className="content" id="autopilot">
-          <section className="welcome-row">
-            <div>
-              <div className="eyebrow green-eyebrow"><span className="spark">✦</span> {dateLabel.toUpperCase()}</div>
-              <h1>Good morning, Rohan<span>.</span></h1>
-              <p className="intro">{message}</p>
-            </div>
-            <div className="date-control"><span>◷</span> {timeLabel} <button className="ghost-button" onClick={advanceTime} disabled={busy}>Advance time</button><button className="ghost-button" onClick={resetDemo} disabled={busy}>Reset</button></div>
-          </section>
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>Something failed</AlertTitle>
+          <AlertDescription className="font-mono text-xs">{error}</AlertDescription>
+        </Alert>
+      )}
 
-          <section className="metric-grid" id="metrics">
-            <div className="metric-card metric-primary"><span className="metric-icon">◉</span><div><small>COMMITMENTS MONITORED</small><strong>{monitoredCount}</strong><em>From operating state</em></div><div className="mini-ring">LIVE</div></div>
-            <div className="metric-card"><span className="metric-icon calm-icon">✓</span><div><small>ON TRACK</small><strong>{onTrackCount}</strong><em className="positive">Current health</em></div></div>
-            <div className="metric-card"><span className="metric-icon warning-icon">!</span><div><small>AT RISK</small><strong>{atRiskCount}</strong><em className="warning-text">Needs monitoring</em></div></div>
-            <div className="metric-card"><span className="metric-icon danger-icon">◈</span><div><small>NEEDS YOU</small><strong>{needsYouCount}</strong><em className="danger-text">{needsYouCount ? "Decision waiting" : "All clear"}</em></div></div>
-          </section>
-
-          {error && <div className="error-banner">⚠ {error}</div>}
-          {approved && (
-            <div className="success-banner" role="status">
-              <div className="success-mark">✓</div>
-              <div>
-                <strong>{selectedOptionLabel} approved successfully</strong>
-                <p>Commitment created · customer response queued · background monitoring is active.</p>
-              </div>
-              <span className="success-status">COMMITTED</span>
-            </div>
-          )}
-
-          <section className="section-heading" id="decisions">
-            <div><span className="section-kicker">ATTENTION REQUIRED</span><h2>Decisions waiting for you</h2></div>
-            <span className="live-label"><i className="live-dot" /> LIVE OPERATIONS</span>
-          </section>
-
-          {riskDecision && riskCommitment ? (
-            <section className="decision-layout">
-              <article className="decision-card card-surface">
-                <div className="decision-top"><div className="customer-mark">AF</div><div className="customer-name"><strong>Acme Foods</strong><span>Background Monitor · Supplier update</span></div><span className="status-pill status-danger"><i /> AT RISK</span></div>
-                <div className="decision-title"><div><span className="section-kicker">MONITOR FINDING</span><h3>Commitment needs attention.</h3></div></div>
-                <div className="promise-strip"><div><small>COMMITTED</small><b>{riskCommitment.committed_deadline}</b></div><div><small>FORECAST</small><b>{riskCommitment.current_forecast ?? "—"}</b></div><div><small>STATUS</small><b>{riskApproved ? "ON TRACK" : "AT RISK"}</b></div></div>
-                <div className="reasons-list"><div className="reason-row"><span className="reason-number reason-1">01</span><div><strong>Supplier delay detected</strong><p>{riskDecision.reason}</p><small>⌁ Monitor evidence verified</small></div></div></div>
-                <div className="decision-footer"><div><span className="agent-status"><i className="live-dot" /> Monitor complete</span><span className="evidence-count">⌁ Human decision required</span></div><button className="primary-button" onClick={approveRisk} disabled={busy || riskApproved}>{riskApproved ? "APPROVED · ON TRACK" : busy ? "APPROVING…" : "APPROVE BACKUP CAPACITY"} <span>↗</span></button></div>
-              </article>
-              <aside className="options-card card-surface">
-                <div className="side-card-heading"><div><span className="section-kicker">RECOMMENDATION</span><h3>Choose a way to protect delivery</h3></div><span className="option-count">{riskDecision.options?.length ?? 0} OPTIONS</span></div>
-                <div className="option-list">
-                  {(riskDecision.options ?? []).map((option) => (
-                    <button type="button" className={`option-row ${selectedOption === option.id ? "selected recommended" : ""}`} key={option.id} onClick={() => setSelectedOption(option.id)} disabled={busy || riskApproved}>
-                      <div className="option-copy"><strong>{option.title}</strong><p>{option.summary}</p></div>
-                      <div className="option-meta"><b>₹{option.extra_cost.amount.toLocaleString("en-IN")}</b><span className="option-check">{selectedOption === option.id ? "✓ SELECTED" : "SELECT"}</span></div>
-                    </button>
-                  ))}
-                </div>
-              </aside>
-            </section>
-          ) : !assessment ? (
-            <section className="empty-command card-surface">
-              <div className="empty-glow" /><div className="empty-icon">✦</div>
-              <div className="empty-copy">
-                <span className="tag purple-tag">NEW CUSTOMER REQUEST</span>
-                <h3>{EXAMPLES[selectedExample].customer} wants to move fast.</h3>
-                <p>{selectedExample === "acme" ? "12 social creatives, a landing page and three short videos." : "A six-page product launch site."} Requested delivery <b>{EXAMPLES[selectedExample].date}</b>.</p>
-                <div className="request-meta"><span>{EXAMPLES[selectedExample].budget} budget</span><span>·</span><span>Received 8 min ago</span></div>
-              </div>
-              <button className="primary-button" onClick={assess} disabled={busy}>{busy ? "INVESTIGATING…" : "CHECK FEASIBILITY"} <span>↗</span></button>
-              <button className="example-switch" onClick={() => setSelectedExample(selectedExample === "acme" ? "nova" : "acme")} disabled={busy}>Try {selectedExample === "acme" ? "Nova Health" : "Acme Foods"} →</button>
-            </section>
-          ) : (
-            <section className="decision-layout">
-              <article className="decision-card card-surface">
-                <div className="decision-top"><div className="customer-mark">{EXAMPLES[selectedExample].initials}</div><div className="customer-name"><strong>{EXAMPLES[selectedExample].customer}</strong><span>{EXAMPLES[selectedExample].scope} · New commitment</span></div><span className={`status-pill ${assessment.decision === "SAFE" ? "status-calm" : "status-danger"}`}><i /> {assessment.decision}</span></div>
-                <div className="decision-title"><div><span className="section-kicker">INVESTIGATOR FINDING</span><h3>{assessment.decision === "SAFE" ? "The requested promise can be kept." : "The requested promise needs a safer path."}</h3></div><div className="confidence"><span>MODEL CONFIDENCE</span><strong>{Math.round((assessment.confidence ?? 0) * 100)}%</strong><div><i /></div></div></div>
-                <div className="promise-strip"><div><small>REQUESTED DELIVERY</small><b>{EXAMPLES[selectedExample].date}</b></div><div><small>PROJECT VALUE</small><b>{EXAMPLES[selectedExample].budget}</b></div><div><small>SCOPE</small><b>{selectedExample === "acme" ? "16 deliverables" : "6 pages"}</b></div></div>
-                <div className="reasons-list">{assessment.reasons.slice(0, 4).map((reason, index) => <div className="reason-row" key={reason.title}><span className={`reason-number reason-${index + 1}`}>0{index + 1}</span><div><strong>{reason.title}</strong><p>{reason.detail}</p><small>⌁ {reason.evidence_ids.length} evidence sources verified</small></div><span className="reason-arrow">↗</span></div>)}</div>
-                <div className="decision-footer"><div><span className="agent-status"><i className="live-dot" /> Investigator complete</span><span className="evidence-count">⌁ {assessment.reasons.length} material findings</span></div><button className="primary-button" onClick={approve} disabled={busy || approved}>{approved ? "APPROVED · MONITORING" : busy ? "SENDING…" : "APPROVE SELECTED OPTION"} <span>↗</span></button></div>
-              </article>
-              <aside className="options-card card-surface">
-                <div className="side-card-heading"><div><span className="section-kicker">SAFER PATHS</span><h3>Choose a way forward</h3></div><span className="option-count">3 OPTIONS</span></div>
-                <div className="option-list">
-                  {assessment.alternatives.map((option, index) => (
-                    <button
-                      type="button"
-                      className={`option-row ${option.recommended ? "recommended" : ""} ${selectedOption === option.id ? "selected" : ""}`}
-                      key={option.id}
-                      aria-pressed={selectedOption === option.id}
-                      disabled={busy || approved}
-                      onClick={() => setSelectedOption(option.id)}
-                    >
-                      <span className="option-letter">{String.fromCharCode(65 + index)}</span>
-                      <div className="option-copy">
-                        <strong>{option.title}</strong>
-                        <p>{option.summary}</p>
-                      </div>
-                      <div className="option-meta">
-                        <b>{option.extra_cost.amount === 0 ? "₹0" : `₹${option.extra_cost.amount.toLocaleString("en-IN")}`}</b>
-                        {option.recommended && <span className="recommended-label">RECOMMENDED</span>}
-                        <span className="option-check">{selectedOption === option.id ? "✓ SELECTED" : "SELECT"}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                {decision && <div className="approval-note"><span>✦</span><p><b>Human approval required</b><br />The agent can investigate and recommend. You decide what Northstar promises.</p></div>}
-              </aside>
-            </section>
-          )}
-
-          <section className="section-heading lower-heading"><div><span className="section-kicker">AUTOPILOT MONITOR</span><h2>Quietly working in the background</h2></div><button className="ghost-button" onClick={simulateSupplierEmail} disabled={busy}>{busy ? "PROCESSING…" : "↗ SEND TEST SUPPLIER UPDATE"}</button></section>
-          <section className="bottom-grid">
-            <div className="timeline-card card-surface" id="activity"><div className="side-card-heading"><div><span className="section-kicker">RECENT ACTIVITY</span><h3>What your agent handled</h3></div><span className="muted-small">TODAY</span></div><div className="timeline">{(activity.length ? activity.slice(-5) : ["Waiting for a request to investigate"]).map((item, index) => <div className="timeline-item" key={`${item}-${index}`}><span className={`timeline-dot ${index === 0 ? "active-dot" : ""}`} /><div><p>{item}</p><small>{index === 0 ? "Just now" : `${index * 2 + 1} min ago`}</small></div></div>)}</div></div>
-            <div className={`risk-card card-surface ${riskDetected ? "risk-live" : ""}`} id="connections"><div className="risk-art"><div className="risk-orb">◒</div><span className="orbit orbit-one" /><span className="orbit orbit-two" /></div><div><span className="section-kicker">{riskDetected ? "MONITOR ALERT" : "AUTONOMOUS MONITORING"}</span><h3>{riskDetected ? "A commitment needs attention." : "Your commitments are covered."}</h3><p>{riskDetected ? "Supplier delay detected. The Monitor has opened a decision without another investigation request." : "The Monitor checks changing suppliers, calendars and dependencies so you do not have to."}</p><span className={`status-pill ${riskDetected ? "status-danger" : "status-calm"}`}><i /> {riskDetected ? "AT RISK · REVIEW NOW" : "ALL SYSTEMS NOMINAL"}</span></div></div>
-          </section>
-          <section className="card-surface" style={{ marginTop: 20, padding: 24 }}>
-            <span className="section-kicker">AUTOPILOT TALLY</span>
-            <h3>{routineActionsCount} routine actions handled automatically · {humanDecisionCount} human decisions</h3>
-          </section>
-          <div id="settings" className="settings-anchor" aria-hidden="true" />
-        </div>
+      <section className="grid gap-3 sm:grid-cols-4">
+        <Stat label="Commitments" value={commitments.length} hint="Jobs already promised" />
+        <Stat label="On track" value={onTrack} hint="Forecast matches the promise" />
+        <Stat label="At risk" value={atRisk} hint="Forecast slipped past the promise" />
+        <Stat label="Needs you" value={openCount} hint="Open decisions only" />
       </section>
-    </main>
+
+      {phase === "working" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Investigator is working</CardTitle>
+            <CardDescription>
+              Checking remaining hours, existing jobs, supplier windows, and the requested date.
+              This usually takes 20–45 seconds.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-3/5" />
+          </CardContent>
+        </Card>
+      )}
+
+      {phase === "idle" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Incoming request</CardTitle>
+            <CardDescription>{current.customer} asked if Northstar can take this work.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm">
+            <p className="max-w-2xl text-muted-foreground">{current.request}</p>
+            <div className="flex flex-wrap gap-2 font-mono text-xs text-muted-foreground">
+              <span>Due {current.date}</span>
+              <span>·</span>
+              <span>{current.budget}</span>
+              <span>·</span>
+              <span>{current.scope}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {(phase === "decide" || phase === "watching") && assessment && (
+        <DecisionPanel
+          title={
+            phase === "watching"
+              ? "Promise is live. The Monitor is watching it."
+              : assessment.decision === "SAFE"
+                ? "This date can be kept — if you accept the recommended option."
+                : "The requested date is unsafe."
+          }
+          badge={assessment.decision}
+          facts={[
+            ["Requested", current.date],
+            ["Budget", current.budget],
+            ["Confidence", `${Math.round((assessment.confidence ?? 0) * 100)}%`],
+          ]}
+          reasons={assessment.reasons}
+          options={assessment.alternatives}
+          selectedId={selectedOption}
+          onSelect={setSelectedOption}
+          locked={phase !== "decide" || busy}
+        />
+      )}
+
+      {phase === "at_risk" && riskDecision && (
+        <DecisionPanel
+          title="A supplier slipped. The committed date may miss."
+          badge="AT RISK"
+          facts={[
+            ["Committed", riskCommitment?.committed_deadline ?? "—"],
+            ["New forecast", riskCommitment?.current_forecast ?? "—"],
+            ["Health", healthLabel(riskCommitment?.health)],
+          ]}
+          reasons={[{ title: "Supplier delay", detail: riskDecision.reason, evidence_ids: [] }]}
+          options={riskDecision.options ?? []}
+          selectedId={selectedOption}
+          onSelect={setSelectedOption}
+          locked={busy}
+        />
+      )}
+
+      {phase === "done" && (
+        <Alert>
+          <AlertTitle>Backup approved. Nothing is waiting on you.</AlertTitle>
+          <AlertDescription>
+            The Monitor caught the slip and you chose a fix. Reset demo to walk the loop again.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {liveCommitment && (phase === "watching" || phase === "at_risk" || phase === "done") && (
+        <p className="text-sm text-muted-foreground">
+          Open{" "}
+          <Link href={`/commitments/${liveCommitment.id}`} className="underline underline-offset-4">
+            {liveCommitment.customer_name}
+          </Link>{" "}
+          or the{" "}
+          <Link href="/activity" className="underline underline-offset-4">
+            activity log
+          </Link>
+          .
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: number; hint: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className="font-mono text-3xl tabular-nums">{value}</CardTitle>
+      </CardHeader>
+      <CardContent className="text-xs text-muted-foreground">{hint}</CardContent>
+    </Card>
+  );
+}
+
+function NowCard({
+  phase,
+  work,
+  customer,
+  selectedTitle,
+  onAssess,
+  onApprove,
+  onSupplier,
+  onFix,
+  onSwitchExample,
+  otherExample,
+  busy,
+}: {
+  phase: Phase;
+  work: WorkKind | null;
+  customer: string;
+  selectedTitle?: string;
+  onAssess: () => void;
+  onApprove: () => void;
+  onSupplier: () => void;
+  onFix: () => void;
+  onSwitchExample: () => void;
+  otherExample: string;
+  busy: boolean;
+}) {
+  const copy = nowCopy(phase, work, customer, selectedTitle);
+  return (
+    <Card className="border-primary/20">
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
+        <div className="max-w-xl">
+          <p className="font-mono text-xs text-muted-foreground">Now</p>
+          <CardTitle className="mt-1 text-xl">{copy.title}</CardTitle>
+          <CardDescription className="mt-2 text-sm">{copy.body}</CardDescription>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {phase === "idle" && (
+            <>
+              <Button onClick={onAssess} disabled={busy}>
+                Check feasibility
+              </Button>
+              <Button variant="ghost" onClick={onSwitchExample} disabled={busy}>
+                Use {otherExample} instead
+              </Button>
+            </>
+          )}
+          {phase === "decide" && (
+            <Button onClick={onApprove} disabled={busy}>
+              {work === "approve" ? "Saving promise…" : `Approve ${selectedTitle ?? "selected option"}`}
+            </Button>
+          )}
+          {phase === "watching" && (
+            <Button onClick={onSupplier} disabled={busy}>
+              {work === "supplier" ? "Monitor is re-checking…" : "Simulate supplier delay"}
+            </Button>
+          )}
+          {phase === "at_risk" && (
+            <Button onClick={onFix} disabled={busy}>
+              {work === "fix" ? "Saving fix…" : `Approve ${selectedTitle ?? "selected option"}`}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function nowCopy(
+  phase: Phase,
+  work: WorkKind | null,
+  customer: string,
+  selectedTitle?: string,
+): { title: string; body: string } {
+  if (work === "investigate") {
+    return {
+      title: `Investigator is checking ${customer}`,
+      body: "Reading capacity, existing commitments, calendars, and supplier windows.",
+    };
+  }
+  if (work === "supplier") {
+    return {
+      title: "Monitor received a supplier email",
+      body: "Frame & Grain slipped. The agent is re-evaluating the promise.",
+    };
+  }
+  switch (phase) {
+    case "idle":
+      return {
+        title: `${customer} asked if you can say yes`,
+        body: "Run the Investigator. A commitment is created only after you approve.",
+      };
+    case "working":
+      return {
+        title: "Investigator is still working",
+        body: "Stay on this page. The finding usually takes 20–45 seconds.",
+      };
+    case "decide":
+      return {
+        title: "Pick the promise",
+        body: `${selectedTitle ?? "An option"} is selected. Approving writes it into the live book.`,
+      };
+    case "watching":
+      return {
+        title: "Committed. Next, prove the Monitor",
+        body: "Simulate the Frame & Grain delay to see the agent reopen a decision.",
+      };
+    case "at_risk":
+      return {
+        title: "Protect the delivery",
+        body: "Approve a fix or the date stays at risk. The Monitor will not change the plan alone.",
+      };
+    case "done":
+      return {
+        title: "Loop complete",
+        body: "Investigate → commit → world changes → Monitor asks → you fix.",
+      };
+    default: {
+      const _exhaustive: never = phase;
+      return _exhaustive;
+    }
+  }
+}
+
+function DecisionPanel({
+  title,
+  badge,
+  facts,
+  reasons,
+  options,
+  selectedId,
+  onSelect,
+  locked,
+}: {
+  title: string;
+  badge: string;
+  facts: [string, string][];
+  reasons: { title: string; detail: string; evidence_ids: string[] }[];
+  options: { id: string; title: string; summary: string; extra_cost: { amount: number }; recommended?: boolean }[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  locked: boolean;
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-lg">{title}</CardTitle>
+            <Badge variant={badge === "SAFE" || badge === "ON TRACK" ? "secondary" : "destructive"}>
+              {badge}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-6">
+          <div className="grid grid-cols-3 gap-4">
+            {facts.map(([label, value]) => (
+              <div key={label}>
+                <p className="font-mono text-[11px] text-muted-foreground">{label}</p>
+                <p className="mt-1 text-sm font-medium">{value}</p>
+              </div>
+            ))}
+          </div>
+          <Separator />
+          <div className="grid gap-3">
+            {reasons.slice(0, 4).map((reason) => (
+              <div key={reason.title}>
+                <p className="text-sm font-medium">{reason.title}</p>
+                <p className="text-sm text-muted-foreground">{reason.detail}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Your options</CardTitle>
+          <CardDescription>One is recommended. You still choose.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          {options.map((option) => {
+            const active = option.id === selectedId;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={locked}
+                onClick={() => onSelect(option.id)}
+                className={`rounded-lg border px-3 py-3 text-left transition-colors ${
+                  active ? "border-primary bg-accent" : "border-border hover:bg-muted/40"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{option.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{option.summary}</p>
+                  </div>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {money(option.extra_cost.amount)}
+                  </span>
+                </div>
+                {option.recommended && (
+                  <p className="mt-2 font-mono text-[11px] text-muted-foreground">Recommended</p>
+                )}
+              </button>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from pydantic import BaseModel, TypeAdapter
@@ -21,7 +22,7 @@ from domain.models import (
 )
 from domain.world import World
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = Path(os.getenv("CISAY_DATA_DIR") or Path(__file__).resolve().parents[2] / "data")
 
 
 def _read_list[T: BaseModel](path: Path, model: type[T]) -> list[T]:

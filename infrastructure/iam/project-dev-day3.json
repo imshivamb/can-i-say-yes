@@ -2,6 +2,24 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "VisualEditor0",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+        "bedrock-mantle:*",
+        "bedrock:GetFoundationModel",
+        "bedrock:ListFoundationModels",
+        "bedrock:ListInferenceProfiles",
+        "bedrock:GetFoundationModelAvailability",
+        "bedrock:ListFoundationModelAgreementOffers",
+        "bedrock:CreateFoundationModelAgreement",
+        "aws-marketplace:ViewSubscriptions",
+        "aws-marketplace:Subscribe"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "EcrPushPull",
       "Effect": "Allow",
       "Action": [
@@ -29,9 +47,18 @@
         "iam:PutRolePolicy",
         "iam:GetRolePolicy"
       ],
-      "Resource": [
-        "arn:aws:iam::910415684961:role/cisay-*"
-      ]
+      "Resource": "arn:aws:iam::910415684961:role/cisay-*"
+    },
+    {
+      "Sid": "ServiceLinkedRoles",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:AWSServiceName": "bedrock-agentcore.amazonaws.com"
+        }
+      }
     },
     {
       "Sid": "AgentCore",
@@ -40,12 +67,6 @@
         "bedrock-agentcore:*",
         "bedrock-agentcore-control:*"
       ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "AppRunner",
-      "Effect": "Allow",
-      "Action": "apprunner:*",
       "Resource": "*"
     },
     {
@@ -59,10 +80,37 @@
         "logs:DescribeLogStreams",
         "logs:PutResourcePolicy",
         "logs:DescribeResourcePolicies",
+        "logs:PutRetentionPolicy",
         "xray:UpdateTraceSegmentDestination",
         "xray:GetTraceSegmentDestination",
         "xray:PutTraceSegments",
         "xray:PutTelemetryRecords"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PublicApiOnFreePlan",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances",
+        "ec2:TerminateInstances",
+        "ec2:StopInstances",
+        "ec2:GetConsoleOutput",
+        "ec2-instance-connect:SendSSHPublicKey",
+        "ec2:DescribeInstances",
+        "ec2:DescribeImages",
+        "ec2:DescribeKeyPairs",
+        "ec2:DescribeSecurityGroups",
+        "ec2:CreateSecurityGroup",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:CreateTags",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:AssociateIamInstanceProfile",
+        "ec2:DescribeIamInstanceProfileAssociations",
+        "iam:CreateInstanceProfile",
+        "iam:AddRoleToInstanceProfile",
+        "iam:GetInstanceProfile"
       ],
       "Resource": "*"
     }

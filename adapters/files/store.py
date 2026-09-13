@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from adapters.files.world import DATA_ROOT, _read_list
+from adapters.files.world import DATA_ROOT, _read_clock, _read_list
 from domain.models import (
     ActivityItem,
     AuditRecord,
@@ -49,7 +49,7 @@ def read_seed_commitment_ids(root: Path | None = None) -> set[str]:
 def read_runtime(root: Path) -> RuntimeState:
     runtime = root / "runtime"
     return RuntimeState(
-        clock=SimulationClock.model_validate_json((runtime / "clock.json").read_text()),
+        clock=_read_clock(runtime / "clock.json"),
         commitments=_read_list(runtime / "commitments.json", Commitment),
         assessments=_read_list(runtime / "assessments.json", FeasibilityAssessment),
         decisions=_read_list(runtime / "decisions.json", HumanDecision),

@@ -1,3 +1,5 @@
+import time
+
 from fastapi.testclient import TestClient
 
 from agent.server import app
@@ -47,6 +49,31 @@ def test_api_replays_full_recorded_commitment_loop(monkeypatch) -> None:
         },
     )
     assert event.json()["opened_decisions"] == 1
+
+
+def test_api_async_job_polls_recorded_assess(monkeypatch) -> None:
+    monkeypatch.setenv("CISAY_RECORDED", "1")
+    created = client.post(
+        "/api/requests",
+        json={"text": "Acme campaign request", "recorded": True},
+    )
+    request_id = created.json()["request"]["id"]
+    started = client.post(f"/api/requests/{request_id}/assess?recorded=true&async_job=true")
+    assert started.status_code == 200
+    body = started.json()
+    assert body["status"] == "pending"
+    job_id = body["job_id"]
+    result = None
+    for _ in range(40):
+        job = client.get(f"/api/jobs/{job_id}").json()
+        if job["status"] == "done":
+            result = job["result"]
+            break
+        if job["status"] == "error":
+            raise AssertionError(job.get("detail"))
+        time.sleep(0.05)
+    assert result is not None
+    assert result["assessment"]["decision"] == "UNSAFE"
 
 
 def test_api_reports_health_and_deduplicates_inbound_events() -> None:

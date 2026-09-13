@@ -24,6 +24,7 @@ IdPrefix = Literal[
     "con",
     "aud",
     "hnd",
+    "job",
 ]
 
 _PREFIXES: frozenset[str] = frozenset(
@@ -48,6 +49,7 @@ _PREFIXES: frozenset[str] = frozenset(
         "con",
         "aud",
         "hnd",
+        "job",
     }
 )
 

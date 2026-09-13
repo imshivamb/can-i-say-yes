@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import os
+import threading
+import traceback
+from collections.abc import Callable
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from adapters.files.runtime import reset_runtime
@@ -19,9 +23,22 @@ from agent.runtime import apply_session_snapshot
 from agent.session import AgentSession
 from agent.trigger import poll_and_reassess
 from domain.fixtures import acme_campaign_request, nova_launch_request
+from domain.ids import new_id
 from domain.models import WorldEvent
 
 app = FastAPI(title="Can I Say Yes?", version="0.2.0")
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(_request: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, HTTPException):
+        raise exc
+    detail: dict[str, Any] = {"detail": str(exc)}
+    if os.getenv("CISAY_DEBUG", "").lower() in {"1", "true", "yes"}:
+        detail["traceback"] = traceback.format_exc()
+    return JSONResponse(status_code=500, content=detail)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins(),
@@ -57,6 +74,40 @@ class InboundEventInput(BaseModel):
     source_reference: str
     related_commitment_ids: list[str] = Field(default_factory=list)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+_JOBS: dict[str, dict[str, Any]] = {}
+_JOBS_LOCK = threading.Lock()
+
+
+def _job_snapshot(job_id: str) -> dict[str, Any] | None:
+    with _JOBS_LOCK:
+        job = _JOBS.get(job_id)
+        return None if job is None else dict(job)
+
+
+def _start_job(work: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+    job_id = new_id("job")
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {"status": "pending"}
+
+    def run() -> None:
+        try:
+            result = work()
+            with _JOBS_LOCK:
+                _JOBS[job_id] = {"status": "done", "result": result}
+        except Exception as exc:
+            with _JOBS_LOCK:
+                _JOBS[job_id] = {"status": "error", "detail": str(exc)}
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"job_id": job_id, "status": "pending"}
+
+
+def _maybe_async(async_job: bool, work: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+    if async_job:
+        return _start_job(work)
+    return work()
 
 
 def _new_session() -> AgentSession:
@@ -114,39 +165,57 @@ def invocations(payload: Invocation) -> dict[str, Any]:
     return {"output": result.model_dump(mode="json")}
 
 
+@app.get("/api/jobs/{job_id}")
+def get_job(job_id: str) -> dict[str, Any]:
+    job = _job_snapshot(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"unknown job: {job_id}")
+    return job
+
+
 @app.post("/api/requests")
-def create_request(payload: RequestInput) -> dict[str, Any]:
-    session = _new_session()
-    if _recorded_mode(payload.recorded):
-        request = acme_campaign_request() if payload.example == "acme" else nova_launch_request()
-        request = request.model_copy(update={"raw_text": payload.text})
-        session.put_request(request)
-    else:
-        request = invoke(session, "parse_request", prompt=payload.text)
-    session.persist()
-    return {"request": request.model_dump(mode="json")}
+def create_request(payload: RequestInput, async_job: bool = False) -> dict[str, Any]:
+    def work() -> dict[str, Any]:
+        session = _new_session()
+        if _recorded_mode(payload.recorded):
+            request = acme_campaign_request() if payload.example == "acme" else nova_launch_request()
+            request = request.model_copy(update={"raw_text": payload.text})
+            session.put_request(request)
+        else:
+            request = invoke(session, "parse_request", prompt=payload.text)
+        session.persist()
+        return {"request": request.model_dump(mode="json")}
+
+    return _maybe_async(async_job, work)
 
 
 @app.post("/api/requests/{request_id}/assess")
-def assess_request(request_id: str, recorded: bool = False) -> dict[str, Any]:
-    session = _new_session()
-    request = _find_or_404(session.requests, request_id, "request")
-    if _recorded_mode(recorded):
-        assessment = run_recorded_investigation(session, request)
-    else:
-        assessment = invoke(session, "assess_feasibility", request=request)
-    decision = None
-    if assessment.required_human_decision:
-        decision = open_decision(
-            session,
-            assessment,
-            reason=f"{assessment.decision}: human approval is required for this promise.",
-        )
-    session.persist()
-    return {
-        "assessment": assessment.model_dump(mode="json"),
-        "decision": decision.model_dump(mode="json") if decision else None,
-    }
+def assess_request(
+    request_id: str,
+    recorded: bool = False,
+    async_job: bool = False,
+) -> dict[str, Any]:
+    def work() -> dict[str, Any]:
+        session = _new_session()
+        request = _find_or_404(session.requests, request_id, "request")
+        if _recorded_mode(recorded):
+            assessment = run_recorded_investigation(session, request)
+        else:
+            assessment = invoke(session, "assess_feasibility", request=request)
+        decision = None
+        if assessment.required_human_decision:
+            decision = open_decision(
+                session,
+                assessment,
+                reason=f"{assessment.decision}: human approval is required for this promise.",
+            )
+        session.persist()
+        return {
+            "assessment": assessment.model_dump(mode="json"),
+            "decision": decision.model_dump(mode="json") if decision else None,
+        }
+
+    return _maybe_async(async_job, work)
 
 
 @app.get("/api/assessments/{assessment_id}")
@@ -233,34 +302,40 @@ def clock() -> dict[str, Any]:
 
 
 @app.post("/api/clock/advance")
-def advance(payload: AdvanceInput) -> dict[str, Any]:
-    session = _new_session()
-    opened = advance_clock(session, payload.to, recorded=payload.recorded)
-    return {"opened_decisions": [item.model_dump(mode="json") for item in opened]}
+def advance(payload: AdvanceInput, async_job: bool = False) -> dict[str, Any]:
+    def work() -> dict[str, Any]:
+        session = _new_session()
+        opened = advance_clock(session, payload.to, recorded=payload.recorded)
+        return {"opened_decisions": [item.model_dump(mode="json") for item in opened]}
+
+    return _maybe_async(async_job, work)
 
 
 @app.post("/api/events/inbound")
-def inbound_event(payload: InboundEventInput) -> dict[str, Any]:
-    session = _new_session()
-    event = WorldEvent(
-        id=payload.event_id,
-        type="supplier_update",
-        occurs_at=session.world.clock.now,
-        source_reference=payload.source_reference,
-        summary=payload.summary,
-        payload=payload.payload,
-        related_commitment_ids=payload.related_commitment_ids,
-    )
-    if any(item.id == event.id for item in session.world.events):
-        return {"status": "duplicate", "event_id": event.id}
-    session.world.events.append(event)
-    session.persist()
-    opened = advance_clock(
-        session,
-        session.world.clock.now,
-        recorded=_recorded_mode(),
-    )
-    return {"status": "accepted", "event_id": event.id, "opened_decisions": len(opened)}
+def inbound_event(payload: InboundEventInput, async_job: bool = False) -> dict[str, Any]:
+    def work() -> dict[str, Any]:
+        session = _new_session()
+        event = WorldEvent(
+            id=payload.event_id,
+            type="supplier_update",
+            occurs_at=session.world.clock.now,
+            source_reference=payload.source_reference,
+            summary=payload.summary,
+            payload=payload.payload,
+            related_commitment_ids=payload.related_commitment_ids,
+        )
+        if any(item.id == event.id for item in session.world.events):
+            return {"status": "duplicate", "event_id": event.id}
+        session.world.events.append(event)
+        session.persist()
+        opened = advance_clock(
+            session,
+            session.world.clock.now,
+            recorded=_recorded_mode(),
+        )
+        return {"status": "accepted", "event_id": event.id, "opened_decisions": len(opened)}
+
+    return _maybe_async(async_job, work)
 
 
 @app.post("/api/integrations/gmail/poll")
@@ -280,5 +355,7 @@ def poll_gmail(query: str = "newer_than:7d") -> dict[str, Any]:
 @app.post("/api/demo/reset")
 def reset() -> dict[str, str]:
     reset_runtime(DATA_ROOT)
+    with _JOBS_LOCK:
+        _JOBS.clear()
     return {"status": "reset"}
 
