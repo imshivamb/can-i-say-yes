@@ -47,6 +47,8 @@ evals/results/*.json
 data/runtime/*
 !data/runtime/.gitkeep
 docs/
+submission.md
+builder-posts.md
 data/runtime/*
 !data/runtime/.gitkeep
 .aws-sam/

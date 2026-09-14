@@ -46,6 +46,10 @@ def live_integrations_enabled() -> bool:
     return os.getenv("CISAY_LIVE_INTEGRATIONS", "").lower() in {"1", "true", "yes"}
 
 
+def live_outbound_enabled() -> bool:
+    return live_integrations_enabled() and bool(os.getenv("SES_FROM_ADDRESS"))
+
+
 class GmailAdapter:
     """Read Gmail using a pre-authorized OAuth access token.
 

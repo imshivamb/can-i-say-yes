@@ -106,6 +106,14 @@ Python 3.12. From a fresh clone:
 8. `CISAY_RECORDED=0 uvicorn agent.server:app --reload --port 8080`
 9. `cd apps/web && npm install && npm run dev` — UI at http://localhost:3000, API at http://localhost:8080
 
+## Use it on your own operation
+
+The seed world is plain JSON. Point the agent at yours:
+
+1. Copy `data/` to a folder of your own and replace the files under `company/`, `projects/`, `suppliers/`, `emails/`, `documents/` (schemas in `docs/schemas.md`, worked example in `docs/world.md`).
+2. `CISAY_DATA_DIR=/path/to/yours`, then press Reset in the UI.
+3. Optional: `CISAY_LIVE_INTEGRATIONS=1`, `GOOGLE_ACCESS_TOKEN`, `GMAIL_ACCESS_TOKEN` — the Calendar and Inbox sources switch from Seed to Live. Open `/world` to confirm, then Poll inbox.
+
 ## Deploy
 
 - UI: `apps/web` on Vercel. Production rewrite `API_PROXY_URL=http://54.237.149.227:8080`.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from strands import tool
 
-from adapters.integrations import SESAdapter, live_integrations_enabled
+from adapters.integrations import SESAdapter, live_outbound_enabled
 from agent.session import current_session
 from agent.tools.common import dump, fail, ok, write_tool
 from domain.escalation import should_escalate
@@ -219,7 +219,7 @@ def send_customer_message(
         sent_at=session.world.clock.now,
     )
     delivery = {"provider": "local_outbox", "status": "queued"}
-    if live_integrations_enabled():
+    if live_outbound_enabled():
         try:
             result = SESAdapter().send(to=to, subject=subject, body=body)
             delivery = {

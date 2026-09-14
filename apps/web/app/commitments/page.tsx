@@ -61,42 +61,69 @@ export default function CommitmentsPage() {
           ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground">No promises yet.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Work</TableHead>
-                  <TableHead>Committed</TableHead>
-                  <TableHead>Forecast</TableHead>
-                  <TableHead>Health</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              <div className="grid gap-3 md:hidden">
                 {items.map((item) => (
-                  <TableRow
+                  <button
                     key={item.id}
-                    className="cursor-pointer"
+                    type="button"
                     onClick={() => router.push(`/commitments/${item.id}`)}
+                    className="rounded-lg border border-border px-3 py-3 text-left"
                   >
-                    <TableCell className="font-medium">{item.customer_name}</TableCell>
-                    <TableCell className="max-w-sm whitespace-normal text-muted-foreground">
-                      {item.title}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {formatDate(item.committed_deadline)}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {formatDate(item.current_forecast)}
-                    </TableCell>
-                    <TableCell>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{item.customer_name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.title}</p>
+                      </div>
                       <Badge variant={item.health === "AT_RISK" ? "destructive" : "secondary"}>
                         {healthLabel(item.health)}
                       </Badge>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                    <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                      {formatDate(item.committed_deadline)} → {formatDate(item.current_forecast)}
+                    </p>
+                  </button>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Work</TableHead>
+                      <TableHead>Committed</TableHead>
+                      <TableHead>Forecast</TableHead>
+                      <TableHead>Health</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => (
+                      <TableRow
+                        key={item.id}
+                        className="cursor-pointer"
+                        onClick={() => router.push(`/commitments/${item.id}`)}
+                      >
+                        <TableCell className="font-medium">{item.customer_name}</TableCell>
+                        <TableCell className="max-w-sm whitespace-normal text-muted-foreground">
+                          {item.title}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {formatDate(item.committed_deadline)}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {formatDate(item.current_forecast)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={item.health === "AT_RISK" ? "destructive" : "secondary"}>
+                            {healthLabel(item.health)}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

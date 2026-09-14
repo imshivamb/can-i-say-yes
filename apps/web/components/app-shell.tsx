@@ -61,19 +61,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border px-4 md:px-8">
-          <nav className="flex gap-4 text-sm md:hidden">
-            {NAV.map((item) => (
-              <Link key={item.href} href={item.href} className="text-muted-foreground hover:text-foreground">
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <Link href="/" className="flex min-w-0 items-center gap-2 md:hidden">
+            <BrandMark className="size-7" />
+            <span className="truncate text-sm font-semibold tracking-tight">Can I Say Yes?</span>
+          </Link>
           <p className="hidden font-mono text-xs text-muted-foreground md:block">
             Autopilot for promises — investigate, commit, then watch
           </p>
           <span className="font-mono text-xs text-muted-foreground">Shivam</span>
         </header>
-        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-8">{children}</div>
+        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-24 md:px-8 md:pb-8">{children}</div>
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+          <div className="grid grid-cols-4">
+            {NAV.map((item) => {
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex flex-col items-center gap-1 py-2.5 text-[11px]",
+                    active ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className="size-4" />
+                  {item.label === "Your world" ? "World" : item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from adapters.files.store import read_runtime, read_seed_commitment_ids
 from adapters.files.world import DATA_ROOT, load_world
 from agent.human import approve_decision, fulfill_approved_option, open_decision
@@ -72,3 +74,20 @@ def test_approve_option_a_persists_sept_22_commitment_and_outbox(tmp_path: Path)
         item.status == "APPROVED" and item.chosen_option_id == "alt_a"
         for item in runtime.decisions
     )
+
+
+def test_approve_queues_local_outbox_when_live_without_ses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CISAY_LIVE_INTEGRATIONS", "1")
+    monkeypatch.delenv("SES_FROM_ADDRESS", raising=False)
+    session = _session(tmp_path)
+    assessment = run_recorded_investigation(session)
+    decision = open_decision(
+        session,
+        assessment,
+        reason="Original Sept 18 date is unsafe.",
+    )
+    approve_decision(session, decision.id, "alt_a")
+    fulfill_approved_option(session, decision.id)
+    assert session.outbox[-1].to == "priya@acmefoods.example"

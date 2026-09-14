@@ -55,7 +55,7 @@ export default function ActivityPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-40">When</TableHead>
+                  <TableHead className="w-28 md:w-40">When</TableHead>
                   <TableHead>Event</TableHead>
                 </TableRow>
               </TableHeader>
